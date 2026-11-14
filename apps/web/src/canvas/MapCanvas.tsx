@@ -13,7 +13,7 @@ import {
   type Edge,
   type NodeChange,
 } from '@xyflow/react';
-import { pathOf, type ConceptNode } from '@mindmapper/shared';
+import { pathOf, progress, type ConceptNode } from '@mindmapper/shared';
 import { nodeMenu, type MenuEntry } from '../nav/nodeActions';
 import { useStore } from '../state/store';
 import { useTheme } from '../theme';
@@ -66,6 +66,8 @@ function ToolButton({ label, onClick, active, disabled, children }: { label: str
 function ZoomPill() {
   const rf = useReactFlow();
   const { zoom } = useViewport();
+  const map = useStore((s) => s.map)!;
+  const left = progress(map).left;
   return (
     <div className="pill" role="group" aria-label="Zoom">
       <button className="tool" aria-label="Zoom out" title="Zoom out" onClick={() => void rf.zoomOut({ duration: 150 })}>
@@ -74,6 +76,14 @@ function ZoomPill() {
       <button className="zoom-value" title="Reset zoom to 100%" onClick={() => void rf.zoomTo(1, { duration: 150 })}>{Math.round(zoom * 100)}%</button>
       <button className="tool" aria-label="Zoom in" title="Zoom in" onClick={() => void rf.zoomIn({ duration: 150 })}>
         <Icon><path d="M12 5v14M5 12h14" /></Icon>
+      </button>
+      <span className="sep-v" aria-hidden />
+      <button
+        className="zoom-value left-btn"
+        onClick={() => useStore.getState().set({ leftOpen: true })}
+        title={left ? `${left} card${left === 1 ? ' has' : 's have'} not been explained yet. Click to see them.` : 'Every card has been explained.'}
+      >
+        {left ? `${left} left` : '✓ all opened'}
       </button>
     </div>
   );
@@ -165,7 +175,8 @@ function Canvas() {
         source: e.source,
         target: e.target,
         className: onPath ? 'on-path' : '',
-        markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: onPath ? ACCENT : GRAY },
+        // A fixed-size open chevron. The default marker scales with the line width, which made solid blobs on thick lines.
+        markerEnd: { type: MarkerType.Arrow, width: 24, height: 24, strokeWidth: 1.6, markerUnits: 'userSpaceOnUse', color: onPath ? ACCENT : GRAY },
         selectable: false,
         focusable: false,
       };
@@ -286,6 +297,13 @@ function Canvas() {
         </ToolButton>
         <ToolButton label="Centre on the selected node" onClick={centreOnSelection} disabled={!selectedId}>
           <circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+        </ToolButton>
+        <span className="sep" aria-hidden />
+        <ToolButton label={`Back to anchor: ${map.nodes[map.view.anchorId]?.title ?? 'anchor'}`} onClick={() => useStore.getState().goToAnchor()}>
+          <circle cx="12" cy="5" r="2.5" /><path d="M12 7.5V21M6 11h12M5 14c0 4 3 7 7 7s7-3 7-7" />
+        </ToolButton>
+        <ToolButton label="Set anchor here" onClick={() => selectedId && useStore.getState().setAnchor(selectedId)} disabled={!selectedId || selectedId === map.view.anchorId}>
+          <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.3" />
         </ToolButton>
         <span className="sep" aria-hidden />
         <ToolButton label="Tidy up: put every node back in automatic layout" onClick={() => void useStore.getState().tidyUp()} disabled={!anyPinned}>

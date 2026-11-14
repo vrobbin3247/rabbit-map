@@ -3,6 +3,7 @@ import type { ProviderStatus } from '@mindmapper/shared';
 import { useStore } from '../state/store';
 import { Banners } from '../ui/Banners';
 import { ConfirmDialog, PromptDialog } from '../ui/Dialog';
+import { Select } from '../ui/Select';
 import { ThemeToggle } from '../ui/ThemeToggle';
 
 const NAMES: Record<string, string> = { claude: 'Claude', codex: 'ChatGPT (Codex)', fake: 'Fake (testing)' };
@@ -78,14 +79,15 @@ export function Home() {
           <input className="field text-base" value={topic} maxLength={200} placeholder="e.g. Deep learning" disabled={noProvider} onChange={(e) => setTopic(e.target.value)} autoFocus />
         </label>
         <div className="flex flex-wrap gap-3">
-          <label className="flex flex-col gap-1 text-sm">
+          <div className="flex min-w-[11rem] flex-col gap-1 text-sm">
             <span className="muted">Your level</span>
-            <select className="field" value={level} onChange={(e) => setLevel(e.target.value)}>
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
-          </label>
+            <Select
+              label="Your level"
+              value={level}
+              options={[{ value: 'beginner', label: 'Beginner' }, { value: 'intermediate', label: 'Intermediate' }, { value: 'advanced', label: 'Advanced' }]}
+              onChange={setLevel}
+            />
+          </div>
           <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-sm">
             <span className="muted">Goal (optional)</span>
             <input className="field" value={goal} maxLength={500} placeholder="e.g. prepare for an exam" onChange={(e) => setGoal(e.target.value)} />

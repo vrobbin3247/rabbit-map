@@ -80,15 +80,15 @@ test('PRD walkthrough: map, explain, links, shared concept, question, ghost link
   await panel(page).getByRole('button', { name: 'Explain' }).click();
   await written(page);
   await expect(depth(page)).toHaveText('depth 3');
-  const toAnchor = page.getByRole('button', { name: /^⚓/ });
-  await expect(toAnchor).toContainText('Deep learning Part A Detail');
+  const toAnchor = page.getByRole('button', { name: /^Back to anchor/ });
+  await expect(toAnchor).toHaveAttribute('aria-label', /Deep learning Part A Detail/);
   await toAnchor.click();
   await expect(panel(page).getByRole('heading', { name: 'Deep learning Part A Detail' })).toBeVisible();
   await page.getByRole('navigation', { name: 'Path from the root' }).getByRole('button', { name: 'Deep learning', exact: true }).click();
   await expect(panel(page).getByRole('heading', { name: 'Deep learning', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.keyboard.press('Alt+ArrowLeft'); // Back
   await expect(panel(page).getByRole('heading', { name: 'Deep learning Part A Detail' })).toBeVisible();
-  await page.getByRole('button', { name: 'Forward', exact: true }).click();
+  await page.keyboard.press('Alt+ArrowRight'); // Forward
   await expect(panel(page).getByRole('heading', { name: 'Deep learning', exact: true })).toBeVisible();
 
   // search
@@ -102,7 +102,7 @@ test('PRD walkthrough: map, explain, links, shared concept, question, ghost link
   await page.reload();
   await page.getByRole('button', { name: /Deep learning/ }).first().click();
   await expect(panel(page).getByRole('heading', { name: 'Deep learning Part B' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /^⚓/ })).toContainText('Deep learning Part A Detail');
+  await expect(page.getByRole('button', { name: /^Back to anchor/ })).toHaveAttribute('aria-label', /Deep learning Part A Detail/);
   await expect(page.getByRole('navigation', { name: 'Trail' }).getByRole('button')).not.toHaveCount(0);
   await node(page, 'Deep learning Part A').click();
   await expect(panel(page).getByText('why?', { exact: true })).toBeVisible();
@@ -529,6 +529,32 @@ test('Escape closes the menu without stopping a running generation; Stop writing
   await node(page, 'Busy __hang__').click({ button: 'right' });
   await item(page, 'Stop writing').click();
   await expect(panel(page).getByRole('button', { name: 'Explain' })).toBeVisible();
+});
+
+test('AI settings: one button opens a themed menu; the custom dropdown changes the level and it is saved', async ({ page }) => {
+  await create(page, 'Settings');
+  await written(page);
+  const summary = page.getByRole('button', { name: /beginner/ });
+  await summary.click();
+  const level = page.getByRole('combobox', { name: 'Learner level' });
+  await level.click();
+  // the list is part of the page (not the operating system's), so it can be found and styled
+  await expect(page.getByRole('listbox', { name: 'Learner level' })).toBeVisible();
+  await page.getByRole('option', { name: 'advanced' }).click();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+  await expect(level).toContainText('advanced');
+  await expect(page.getByRole('button', { name: /· advanced$/ })).toBeVisible();
+  // Escape closes an open list first, then the menu
+  await level.click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+  await expect(level).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(level).toHaveCount(0);
+  // saved with the map
+  await page.reload();
+  await page.getByRole('button', { name: /Settings/ }).first().click();
+  await expect(page.getByRole('button', { name: /· advanced$/ })).toBeVisible();
 });
 
 test('theme toggle: light, dark, system; remembered; the board follows', async ({ page }) => {

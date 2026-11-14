@@ -128,6 +128,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 .logo { display: inline-block; flex: none; background: var(--ink); -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; }
 .logo-stacked { --logo: url('/rabbit-stacked.png'); width: 60px; height: 44px; }
 .logo-mark { --logo: url('/rabbit-mark.png'); width: 44px; height: 48px; }
+.logo-sm { --logo: url('/rabbit-mark.png'); width: 46px; height: 50px; }
 
 @layer components {
 /* Buttons: a flat fill, with the outline drawn on a pseudo-element so the SVG filter wobbles the line and not the text. */
@@ -145,6 +146,14 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 .btn-hl { background: var(--marker-y); }
 .field { border: 2px solid var(--ink); border-radius: var(--wob); padding: 5px 12px; background: var(--panel); width: 100%; }
 .field-hl { background-color: var(--marker-y); }
+.select-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; cursor: pointer; }
+.menu button.select-btn { padding: 5px 12px; border: 2px solid var(--ink); border-radius: var(--wob); background: var(--panel); }
+.menu button.select-btn:hover:not(:disabled) { background: var(--panel); }
+.select-list { left: 0; right: auto; top: 100%; width: 100%; min-width: 0; margin: 4px 0 0; padding: 4px; list-style: none; z-index: 30; }
+.opt { display: flex; justify-content: space-between; gap: 10px; padding: 3px 10px; border-radius: 8px; cursor: pointer; }
+.opt.active { background: var(--marker-y); }
+.opt[aria-selected='true'] { color: var(--accent); }
+.opt.disabled { opacity: 0.45; cursor: not-allowed; }
 .chip { position: relative; display: inline-flex; align-items: center; gap: 4px; padding: 1px 12px; border: 0; border-radius: 999px; background: var(--panel); font-size: 14px; cursor: pointer; }
 .chip::before { border-width: 1.6px; }
 .chip.stub::before { border-style: dashed; }
@@ -159,8 +168,14 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 
 .sheet { border: 2px solid var(--ink); border-radius: var(--wob-lg); background: var(--panel); box-shadow: var(--shadow); }
 .topbar { background: var(--panel); border-bottom: 2.5px solid var(--ink); }
+.searchbar { display: flex; align-items: center; gap: 10px; width: min(290px, 21vw); min-width: 9rem; height: 40px; padding: 0 16px; font-size: 17px; border: 2px solid var(--ink); border-radius: var(--wob); background: var(--bg); cursor: text; }
+.searchbar:hover { background: var(--marker-y); }
+.searchbar:hover .muted { color: var(--text); }
+.logo-btn { padding: 2px 8px; margin-right: 6px; border-radius: 16px; }
+.logo-btn .logo-sm { margin: 0; }
 .topbar .seg::before { display: none; }
-.topbar .seg { padding: 0; }
+.topbar .seg { padding: 0; gap: 4px; }
+.topbar .btn-sm { font-size: 17px; padding: 5px 14px; }
 .crumb-now { position: relative; font-weight: 400; background: linear-gradient(transparent 58%, var(--marker-b) 58%, var(--marker-b) 90%, transparent 90%); border-radius: 3px 8px 4px 9px; padding: 0 6px; transform: rotate(-1deg); }
 
 /* Markdown: the long reading text stays in a plain face. */
@@ -216,10 +231,12 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 .tool:disabled { opacity: 0.35; cursor: not-allowed; }
 .pill .tool { border-radius: 999px; }
 .zoom-value { min-width: 52px; border: 0; background: none; border-radius: 999px; cursor: pointer; font-size: 15px; height: 34px; }
+.sep-v { width: 2px; height: 20px; margin: 0 4px; background: var(--border); border-radius: 2px; }
+.left-btn { padding: 0 12px; }
 .zoom-value:hover { background: var(--marker-y); }
 .seg { position: relative; display: inline-flex; padding: 2px; gap: 2px; border: 0; border-radius: 999px; background: var(--panel); }
 .seg::before { border-width: 1.6px; }
-.seg-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 24px; border: 0; border-radius: 999px; background: none; color: var(--muted); cursor: pointer; }
+.seg-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 30px; border: 0; border-radius: 999px; background: none; color: var(--muted); cursor: pointer; }
 .seg-btn:hover { color: var(--text); }
 .seg-btn.on { background: var(--marker-y); color: var(--ink); }
 .sep { height: 2px; margin: 3px 4px; background: var(--border); border-radius: 2px; }

@@ -66,7 +66,7 @@ MINDMAPPER_DATA_DIR=~/Documents/mindmapper-data npm run dev
 ![The Mindmapper screen with numbered parts](assets/screen-annotated.png)
 
 1. **Top bar.** Provider, model and level, the theme switch, search and export.
-2. **Where you are.** Back and Forward, the breadcrumb, the depth counter, **N left**, **Set anchor here** and the button that jumps back to the anchor.
+2. **Where you are.** The breadcrumb, the depth counter, **N left**, the pin that sets the anchor here, and the anchor button that jumps back to it.
 3. **Board tools.** Fit the whole map, centre on the selected card, tidy up, show all cross-links, show a minimap.
 4. **Trail.** The cards you visited, in order. Open it with the arrow; it is collapsed here.
 5. **The board.** Cards and their connectors. Pan by dragging the background, zoom with the wheel or the `−` `+` buttons.
@@ -111,7 +111,7 @@ Learning gets deep fast, so four tools are always on screen:
 
 - **Breadcrumb**: where this card sits in the subject, from the root down. Click any part to jump there.
 - **Trail**: the cards you visited, in order. Click one to return to it.
-- **Back and Forward** (or `Alt+←` and `Alt+→`): step through the trail like a browser.
+- **Back and Forward** (`Alt+←` and `Alt+→`): step through the trail like a browser.
 - **Anchor**: the card you consider "home". It starts as the root. Press **Set anchor here** on any card, and the **⚓** button in the top bar (or the `A` key) brings you straight back. The **depth** counter turns amber at depth 5, a hint that you are well down a rabbit hole.
 
 **Search** (`Cmd/Ctrl+K`) finds a card by name or alternative name.

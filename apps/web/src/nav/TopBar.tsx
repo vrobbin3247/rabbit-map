@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
-import { progress } from '@mindmapper/shared';
 import { useStore } from '../state/store';
+import { Select } from '../ui/Select';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { Breadcrumb } from './Breadcrumb';
 
@@ -22,7 +22,8 @@ function SettingsMenu() {
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      // An open list inside the menu closes first; it handles Escape itself.
+      if (e.key === 'Escape' && !ref.current?.querySelector('[role="listbox"]')) {
         e.stopPropagation();
         setOpen(false);
       }
@@ -44,97 +45,73 @@ function SettingsMenu() {
       </button>
       {open && (
         <div className="menu" style={{ minWidth: 230, padding: 12 }} role="group" aria-label="AI settings">
-          <label className="mb-2 flex flex-col gap-1 text-sm">
-            Provider
-            <select
-              className="field"
-              aria-label="Provider"
+          <div className="mb-2 flex flex-col gap-1 text-sm">
+            <span>Provider</span>
+            <Select
+              label="Provider"
               value={map.settings.provider}
-              onChange={(e) => void st().patchSettings({ provider: e.target.value, model: null })}
-            >
-              {(health?.providers ?? []).map((p) => (
-                <option key={p.id} value={p.id} disabled={!p.usable && p.id !== map.settings.provider}>
-                  {p.id === 'claude' ? 'Claude' : p.id === 'codex' ? 'ChatGPT (Codex)' : p.id}{p.usable ? '' : ' (unavailable)'}
-                </option>
-              ))}
-              {!provider && <option value={map.settings.provider}>{map.settings.provider}</option>}
-            </select>
-          </label>
+              options={[
+                ...(health?.providers ?? []).map((p) => ({
+                  value: p.id,
+                  label: `${p.id === 'claude' ? 'Claude' : p.id === 'codex' ? 'ChatGPT (Codex)' : p.id}${p.usable ? '' : ' (unavailable)'}`,
+                  disabled: !p.usable && p.id !== map.settings.provider,
+                })),
+                ...(!provider ? [{ value: map.settings.provider, label: map.settings.provider }] : []),
+              ]}
+              onChange={(v) => void st().patchSettings({ provider: v, model: null })}
+            />
+          </div>
           {provider && provider.models.length > 0 && (
-            <label className="mb-2 flex flex-col gap-1 text-sm">
-              Model
-              <select className="field" aria-label="Model" value={map.settings.model ?? ''} onChange={(e) => void st().patchSettings({ model: e.target.value || null })}>
-                <option value="">default model</option>
-                {provider.models.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </label>
+            <div className="mb-2 flex flex-col gap-1 text-sm">
+              <span>Model</span>
+              <Select
+                label="Model"
+                value={map.settings.model ?? ''}
+                options={[{ value: '', label: 'default model' }, ...provider.models.map((m) => ({ value: m, label: m }))]}
+                onChange={(v) => void st().patchSettings({ model: v || null })}
+              />
+            </div>
           )}
-          <label className="flex flex-col gap-1 text-sm">
-            Your level
-            <select className="field" aria-label="Learner level" value={map.settings.level} onChange={(e) => void st().patchSettings({ level: e.target.value })}>
-              <option value="beginner">beginner</option>
-              <option value="intermediate">intermediate</option>
-              <option value="advanced">advanced</option>
-            </select>
-          </label>
+          <div className="flex flex-col gap-1 text-sm">
+            <span>Your level</span>
+            <Select
+              label="Learner level"
+              value={map.settings.level}
+              options={[{ value: 'beginner', label: 'beginner' }, { value: 'intermediate', label: 'intermediate' }, { value: 'advanced', label: 'advanced' }]}
+              onChange={(v) => void st().patchSettings({ level: v })}
+            />
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-/** Everything lives on one row, and nothing is outlined: controls are text until you point at them. */
+/** One slim row with no outlines: the logo is home, the breadcrumb says where you are, and search is the main control. */
 export function TopBar() {
   const map = useStore((s) => s.map)!;
-  const index = useStore((s) => s.index)!;
-  const forwardCount = useStore((s) => s.forward.length);
   const st = useStore.getState;
-  const sel = map.view.selectedId;
-  const depth = sel ? (index.depth.get(sel) ?? 0) : 0;
-  const anchor = map.nodes[map.view.anchorId];
-  const awayFromAnchor = sel !== map.view.anchorId;
-  const left = progress(map).left;
 
   return (
     <header className="topbar">
-      <div className="flex flex-wrap items-center gap-x-1 gap-y-1 px-3 py-1.5">
-        <span className="logo logo-stacked" role="img" aria-label="Rabbit Map" />
-        <button className="btn btn-ghost btn-sm" onClick={() => void st().closeMap()}>‹ Maps</button>
-        <button className="btn btn-ghost btn-sm" aria-label="Back" title="Back (Alt+←)" disabled={map.view.trail.length < 2} onClick={() => st().back()}>←</button>
-        <button className="btn btn-ghost btn-sm" aria-label="Forward" title="Forward (Alt+→)" disabled={forwardCount === 0} onClick={() => st().forwardNav()}>→</button>
-
-        <div className="mx-2 min-w-[12rem] flex-1 max-[1100px]:order-last max-[1100px]:mx-0 max-[1100px]:basis-full"><Breadcrumb /></div>
-
-        <span className={`px-1 text-sm ${depth >= 5 ? 'text-[var(--warn)]' : 'muted'}`} title={depth >= 5 ? 'You are deep in a branch. The anchor takes you back.' : 'Levels below the root'}>depth {depth}</span>
-        <span className="muted" aria-hidden>•</span>
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => st().set({ leftOpen: true })}
-          title={left ? `${left} card${left === 1 ? ' has' : 's have'} not been explained yet. Click to see them.` : 'Every card has been explained.'}
-        >
-          {left ? `${left} left` : '✓ all opened'}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2">
+        <button className="btn btn-ghost logo-btn" aria-label="All maps" title="All maps" onClick={() => void st().closeMap()}>
+          <span className="logo logo-sm" role="img" aria-label="Rabbit Map" />
         </button>
-        {awayFromAnchor && sel && (
-          <button className="btn btn-ghost btn-sm" aria-label="Set anchor here" title="Make this node the anchor" onClick={() => st().setAnchor(sel)}>Set anchor</button>
-        )}
-        <button
-          className={`btn btn-ghost btn-sm ${awayFromAnchor ? 'text-[var(--accent)]' : ''}`}
-          title={`Back to anchor: ${anchor?.title ?? 'anchor'} (A)`}
-          onClick={() => st().goToAnchor()}
-        >
-          {/* The root's name is already the start of the breadcrumb, so only a moved anchor is named. */}
-          ⚓{map.view.anchorId !== map.rootId && anchor && <span className="max-w-[10rem] truncate"> {anchor.title}</span>}
-        </button>
-        <button className="btn btn-ghost btn-sm" aria-label="Search" title="Search cards (⌘K)" onClick={() => st().set({ searchOpen: true })}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+
+        <div className="mx-2 min-w-[12rem] flex-1 max-[1180px]:order-last max-[1180px]:mx-0 max-[1180px]:basis-full"><Breadcrumb /></div>
+
+        <button className="searchbar" aria-label="Search" title="Search cards (⌘K)" onClick={() => st().set({ searchOpen: true })}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
             <circle cx="11" cy="11" r="6.5" />
             <path d="M16 16l4.5 4.5" />
           </svg>
-          <span className="kbd">⌘K</span>
+          <span className="muted">Search cards</span>
         </button>
         <button
           className="btn btn-ghost btn-sm"
-          title="Write each node as a Markdown file"
+          aria-label="Export"
+          title="Export: write each card as a Markdown file"
           onClick={async () => {
             try {
               const r = await api.exportMap(map.id);
@@ -144,10 +121,12 @@ export function TopBar() {
             }
           }}
         >
-          Export
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14" />
+          </svg>
         </button>
 
-        <span className="mx-1 h-5 w-px bg-[var(--border)]" aria-hidden />
+        <span className="mx-1 h-7 w-0.5 rounded bg-[var(--border)]" aria-hidden />
         <SettingsMenu />
         <ThemeToggle />
       </div>

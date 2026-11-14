@@ -88,6 +88,7 @@ export function NodePanel() {
   const provider = health?.providers.find((p) => p.id === map.settings.provider);
   const streams = provider?.streams ?? true;
   const generating = node.status === 'generating' || (stream?.kind === 'expand');
+  const depthNow = index.depth.get(node.id) ?? 0;
   const children = (index.children.get(node.id) ?? []).map((id) => map.nodes[id]).filter((n): n is ConceptNode => !!n);
   const mentioned = [...(index.backLinks.get(node.id) ?? [])].map((id) => map.nodes[id]).filter((n): n is ConceptNode => !!n);
   const ghosts = index.ghostTargets.get(node.id) ?? [];
@@ -103,6 +104,9 @@ export function NodePanel() {
         <div className="min-w-0">
           <h2 ref={heading} tabIndex={-1} className="m-0 text-lg font-semibold leading-tight outline-none">{node.title}</h2>
           {node.aliases.length > 0 && <div className="text-xs muted">also: {node.aliases.join(', ')}</div>}
+          <div className={`text-xs ${depthNow >= 5 ? 'text-[var(--warn)]' : 'muted'}`} title={depthNow >= 5 ? 'You are deep in a branch. The anchor takes you back.' : 'Levels below the root'}>
+            <span>depth {depthNow}</span>
+          </div>
         </div>
         <NodeMenu node={node} />
       </header>
