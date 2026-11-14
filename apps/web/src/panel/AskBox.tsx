@@ -25,7 +25,7 @@ export function AskBox({ node }: { node: ConceptNode }) {
   };
 
   return (
-    <div className="border-t border-[var(--border)] bg-[var(--panel)] p-3">
+    <div className="border-t-2 border-[var(--ink)] bg-[var(--panel)] p-3">
       {quote && (
         <div className="mb-2 flex items-start gap-2 rounded-lg bg-[var(--sunken)] px-2 py-1 text-xs">
           <span className="flex-1 italic muted">“{quote}”</span>

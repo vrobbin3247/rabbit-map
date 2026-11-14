@@ -64,7 +64,7 @@ export function Home() {
       <Banners />
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="m-0 text-2xl font-bold">Mindmapper</h1>
+          <h1 className="m-0 flex items-center gap-3 text-4xl"><span className="logo logo-mark" role="img" aria-label="Rabbit Map logo" />Mindmapper</h1>
           <p className="m-0 muted">Learn a topic without losing the thread.</p>
         </div>
         <ThemeToggle />
@@ -72,7 +72,7 @@ export function Home() {
 
       <ProviderChips />
 
-      <form className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4" onSubmit={(e) => { e.preventDefault(); void create(); }}>
+      <form className="sheet flex flex-col gap-3 p-5" onSubmit={(e) => { e.preventDefault(); void create(); }}>
         <label className="flex flex-col gap-1">
           <span className="font-medium">What do you want to learn?</span>
           <input className="field text-base" value={topic} maxLength={200} placeholder="e.g. Deep learning" disabled={noProvider} onChange={(e) => setTopic(e.target.value)} autoFocus />
@@ -98,11 +98,11 @@ export function Home() {
       </form>
 
       <section aria-label="Your maps">
-        <h2 className="mb-2 mt-0 text-sm font-semibold uppercase tracking-wide muted">Your maps</h2>
+        <h2 className="mb-2 mt-0 text-lg muted">Your maps</h2>
         {maps.length === 0 && <p className="muted">No maps yet.</p>}
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {maps.map((m) => (
-            <li key={m.id} className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
+            <li key={m.id} className="sheet flex items-center gap-2 px-3 py-2">
               <button className="flex-1 text-left" onClick={() => void useStore.getState().openMap(m.id)}>
                 <div className="font-medium">{m.title}</div>
                 <div className="text-xs muted">{m.nodeCount} node{m.nodeCount === 1 ? '' : 's'} · opened {new Date(m.updatedAt).toLocaleString()}</div>

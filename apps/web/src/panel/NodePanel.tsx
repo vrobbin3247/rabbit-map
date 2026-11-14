@@ -99,7 +99,7 @@ export function NodePanel() {
 
   return (
     <aside className="flex h-full min-h-0 flex-col bg-[var(--panel)]" aria-label={`Node: ${node.title}`}>
-      <header className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
+      <header className="flex items-start justify-between gap-2 border-b-2 border-dashed border-[var(--ink-soft)] px-4 py-3">
         <div className="min-w-0">
           <h2 ref={heading} tabIndex={-1} className="m-0 text-lg font-semibold leading-tight outline-none">{node.title}</h2>
           {node.aliases.length > 0 && <div className="text-xs muted">also: {node.aliases.join(', ')}</div>}

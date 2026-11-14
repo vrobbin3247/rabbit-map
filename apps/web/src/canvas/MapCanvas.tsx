@@ -22,8 +22,8 @@ import { ConceptNodeView, TONES, TONE_HEX, type ConceptFlowNode } from './Concep
 import { NODE_H, NODE_W, computeAuto, placeNodes } from './layout';
 
 const nodeTypes = { concept: ConceptNodeView };
-const GRAY = '#94a3b8';
-const ACCENT = '#6366f1';
+const GRAY = '#7c78a8';
+const ACCENT = '#5b4fe0';
 const MINIMAP_KEY = 'mindmapper.minimap';
 
 /**
@@ -318,7 +318,7 @@ function Canvas() {
           zoomable
           position="bottom-right"
           nodeStrokeWidth={2}
-          nodeColor={(n) => ((n.data as { node?: ConceptNode })?.node?.status === 'stub' ? '#d6d9df' : (TONE_HEX[(n.data as { node?: ConceptNode })?.node?.color ?? ((n.data as { depth?: number })?.depth ?? 0) % TONES] as string))}
+          nodeColor={(n) => ((n.data as { node?: ConceptNode })?.node?.status === 'stub' ? '#d9d3b8' : (TONE_HEX[(n.data as { node?: ConceptNode })?.node?.color ?? ((n.data as { depth?: number })?.depth ?? 0) % TONES] as string))}
           ariaLabel="Minimap"
         />
       )}

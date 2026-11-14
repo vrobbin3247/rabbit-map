@@ -152,14 +152,14 @@ export function MapView() {
             <MapCanvas />
           </main>
         </div>
-        <div role="separator" aria-orientation="vertical" aria-label="Resize panel" tabIndex={0} className="hidden w-1.5 shrink-0 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)] min-[860px]:block" onPointerDown={startDrag}
+        <div role="separator" aria-orientation="vertical" aria-label="Resize panel" tabIndex={0} className="hidden w-1.5 shrink-0 cursor-col-resize bg-[var(--ink)] hover:bg-[var(--accent)] min-[860px]:block" onPointerDown={startDrag}
           onKeyDown={(e) => {
             if (e.key === 'ArrowLeft') setWidth((w) => Math.min(800, w + 20));
             if (e.key === 'ArrowRight') setWidth((w) => Math.max(320, w - 20));
           }} />
         <div
           style={{ '--panel-w': `${width}px` } as React.CSSProperties}
-          className="h-[46%] min-h-0 shrink-0 border-t border-[var(--border)] min-[860px]:h-auto min-[860px]:w-[min(var(--panel-w),55vw)] min-[860px]:border-t-0"
+          className="h-[46%] min-h-0 shrink-0 border-t-2 border-[var(--ink)] min-[860px]:h-auto min-[860px]:w-[min(var(--panel-w),55vw)] min-[860px]:border-t-0"
         >
           <NodePanel />
         </div>
