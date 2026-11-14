@@ -101,13 +101,16 @@ export function TopBar() {
 
         <div className="mx-2 min-w-[12rem] flex-1 max-[1180px]:order-last max-[1180px]:mx-0 max-[1180px]:basis-full"><Breadcrumb /></div>
 
-        <button className="searchbar" aria-label="Search" title="Search cards (⌘K)" onClick={() => st().set({ searchOpen: true })}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-            <circle cx="11" cy="11" r="6.5" />
-            <path d="M16 16l4.5 4.5" />
-          </svg>
-          <span className="muted">Search cards</span>
-        </button>
+        {/* A magnifier that opens out into a bar when you point at it, so the breadcrumb keeps the room. */}
+        <div className="search-slot">
+          <button className="searchbar" aria-label="Search" title="Search cards (⌘K)" onClick={() => st().set({ searchOpen: true })}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="M16 16l4.5 4.5" />
+            </svg>
+            <span className="muted">Search cards</span>
+          </button>
+        </div>
         <button
           className="btn btn-ghost btn-sm"
           aria-label="Export"

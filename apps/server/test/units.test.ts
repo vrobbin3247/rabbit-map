@@ -34,6 +34,7 @@ describe('context', () => {
     );
     expect(system).toContain('150 to 220 words');
     expect(system).toContain('4 to 7 concepts');
+    expect(system).not.toContain('name every main one'); // the overview already lists the main parts
     expect(system).toContain('The learner is a beginner');
   });
 
@@ -43,6 +44,9 @@ describe('context', () => {
     const { system, prompt } = buildExpandPrompt(m, cnn.id);
     expect(system).toContain('120 to 200 words');
     expect(system).toContain('3 to 5 concepts');
+    // a concept with a set of kinds should be shown whole, not just its commonest members
+    expect(system).toContain('name every main one');
+    expect(system).toContain('up to 8');
     expect(prompt).toBe(
       [
         'MAP TOPIC: Deep learning',
@@ -156,11 +160,11 @@ describe('finishExpand', () => {
     expectValid(m);
   });
 
-  it('caps new children at seven', () => {
+  it('caps new children at ten', () => {
     const m = sample();
     startExpand(m, m.rootId);
-    finishExpand(m, m.rootId, { body: 'b', summary: '', aliases: [], children: Array.from({ length: 12 }, (_, i) => child(`Extra ${i}`)), metaRecovered: false }, gen);
-    expect(Object.values(m.nodes).filter((n) => n.title.startsWith('Extra'))).toHaveLength(7);
+    finishExpand(m, m.rootId, { body: 'b', summary: '', aliases: [], children: Array.from({ length: 14 }, (_, i) => child(`Extra ${i}`)), metaRecovered: false }, gen);
+    expect(Object.values(m.nodes).filter((n) => n.title.startsWith('Extra'))).toHaveLength(10);
   });
 });
 

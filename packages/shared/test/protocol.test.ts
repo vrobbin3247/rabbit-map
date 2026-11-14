@@ -55,16 +55,16 @@ describe('parseExpandOutput', () => {
     expect(parseExpandOutput('# Other\n\nBody', 'Topic', [], none).body).toBe('# Other\n\nBody');
   });
 
-  it('drops self, duplicate and bracketed children, and caps at 7', () => {
+  it('drops self, duplicate and bracketed children, and caps at 10', () => {
     const kids = [
       { title: 'Topic', summary: '' },
       { title: '[[A]]', summary: 'a' },
       { title: 'a', summary: 'dup of A by slug' },
-      ...'BCDEFGHIJ'.split('').map((c) => ({ title: `Concept ${c}`, summary: '' })),
+      ...'BCDEFGHIJKLM'.split('').map((c) => ({ title: `Concept ${c}`, summary: '' })),
     ];
     const t = `Body\n===META===\n${JSON.stringify({ summary: '', aliases: [], children: kids })}`;
     const r = parseExpandOutput(t, 'Topic', [], none);
-    expect(r.children).toHaveLength(7);
+    expect(r.children).toHaveLength(10);
     expect(r.children[0]).toEqual({ title: 'A', summary: 'a' });
     expect(r.children.map((c) => c.title)).not.toContain('Topic');
     expect(r.children.map((c) => c.title)).not.toContain('a');

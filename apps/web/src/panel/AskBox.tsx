@@ -49,7 +49,7 @@ export function AskBox({ node }: { node: ConceptNode }) {
             }
           }}
         />
-        <button className="btn btn-primary" disabled={busy || !text.trim()} onClick={send}>Ask</button>
+        <button className="btn btn-primary btn-ask" disabled={busy || !text.trim()} onClick={send}>Ask</button>
       </div>
     </div>
   );

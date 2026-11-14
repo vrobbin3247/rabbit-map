@@ -6,7 +6,7 @@ export const LIMITS = {
   titleMax: 80,
   summaryMax: 200,
   aliasesMax: 6,
-  childrenMax: 7,
+  childrenMax: 10,
   questionMax: 2000,
   quoteMax: 600,
   snippetMax: 400,

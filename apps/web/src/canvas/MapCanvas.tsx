@@ -23,8 +23,9 @@ import { NODE_H, NODE_W, computeAuto, placeNodes } from './layout';
 
 const nodeTypes = { concept: ConceptNodeView };
 const GRAY = '#7c78a8';
-const ACCENT = '#5b4fe0';
+const ACCENT = '#4f82e8'; // "current": the selected card and the path to it share this blue
 const MINIMAP_KEY = 'mindmapper.minimap';
+const SPOTLIGHT_KEY = 'mindmapper.spotlight';
 
 /**
  * The tool strip floats over the left edge of the board (it ends near 68 px). Fitting and centring
@@ -47,9 +48,17 @@ function readMinimap(): boolean {
   }
 }
 
+function readSpotlight(): boolean {
+  try {
+    return localStorage.getItem(SPOTLIGHT_KEY) !== 'off'; // on unless the learner turned it off
+  } catch {
+    return true;
+  }
+}
+
 function Icon({ children }: { children: ReactNode }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg className="sk" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       {children}
     </svg>
   );
@@ -66,8 +75,6 @@ function ToolButton({ label, onClick, active, disabled, children }: { label: str
 function ZoomPill() {
   const rf = useReactFlow();
   const { zoom } = useViewport();
-  const map = useStore((s) => s.map)!;
-  const left = progress(map).left;
   return (
     <div className="pill" role="group" aria-label="Zoom">
       <button className="tool" aria-label="Zoom out" title="Zoom out" onClick={() => void rf.zoomOut({ duration: 150 })}>
@@ -77,7 +84,16 @@ function ZoomPill() {
       <button className="tool" aria-label="Zoom in" title="Zoom in" onClick={() => void rf.zoomIn({ duration: 150 })}>
         <Icon><path d="M12 5v14M5 12h14" /></Icon>
       </button>
-      <span className="sep-v" aria-hidden />
+    </div>
+  );
+}
+
+/** How many cards are still unexplained. It is about the map, not the viewport, so it sits apart from the zoom. */
+function LeftChip() {
+  const map = useStore((s) => s.map)!;
+  const left = progress(map).left;
+  return (
+    <div className="pill left-chip">
       <button
         className="zoom-value left-btn"
         onClick={() => useStore.getState().set({ leftOpen: true })}
@@ -134,6 +150,7 @@ function Canvas() {
   const heading = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const selectedId = map.view.selectedId;
   const [minimap, setMinimap] = useState(readMinimap);
+  const [spotlight, setSpotlight] = useState(readSpotlight);
   // Positions of nodes being dragged right now; committed to the map when the drag ends.
   const [live, setLive] = useState<Record<string, { x: number; y: number }>>({});
 
@@ -144,6 +161,14 @@ function Canvas() {
   const { nodes, edges } = useMemo(() => {
     const path = new Set(selectedId ? pathOf(map, selectedId) : []);
     const visited = new Set(map.view.trail);
+    // Spotlight: keep the path, its direct neighbours (so siblings and children stay) and the selected card's links at full strength.
+    const near = new Set<string>([...(index.outLinks.get(selectedId ?? '') ?? []), ...(index.backLinks.get(selectedId ?? '') ?? [])]);
+    const dimmed = (id: string): boolean => {
+      if (!spotlight || !selectedId) return false;
+      const n = map.nodes[id];
+      if (!n || n.status === 'generating' || path.has(id) || near.has(id)) return false;
+      return !(n.parentId && path.has(n.parentId));
+    };
     const nodes: ConceptFlowNode[] = auto.visible.map((id) => {
       const n = map.nodes[id] as ConceptNode;
       return {
@@ -164,6 +189,7 @@ function Canvas() {
           hidden: auto.hidden.get(id) ?? 0,
           questions: n.thread.filter((m) => m.role === 'user').length,
           depth: index.depth.get(id) ?? 0,
+          dim: dimmed(id),
         },
       };
     });
@@ -174,7 +200,7 @@ function Canvas() {
         id: e.id,
         source: e.source,
         target: e.target,
-        className: onPath ? 'on-path' : '',
+        className: [onPath && 'on-path', dimmed(e.target) && 'dim'].filter(Boolean).join(' '),
         // A fixed-size open chevron. The default marker scales with the line width, which made solid blobs on thick lines.
         markerEnd: { type: MarkerType.Arrow, width: 24, height: 24, strokeWidth: 1.6, markerUnits: 'userSpaceOnUse', color: onPath ? ACCENT : GRAY },
         selectable: false,
@@ -198,7 +224,7 @@ function Canvas() {
       for (const from of index.backLinks.get(selectedId) ?? []) addCross(from, selectedId);
     }
     return { nodes, edges };
-  }, [map, index, auto, positions, selectedId, showAll]);
+  }, [map, index, auto, positions, selectedId, showAll, spotlight]);
 
   /** Put a node in the middle of the free area, not the middle of the whole board. */
   const centreOn = (pos: { x: number; y: number }, zoom: number, duration: number) => {
@@ -313,6 +339,20 @@ function Canvas() {
           <path d="M9 15l6-6" /><path d="M11 6l1-1a4 4 0 015.7 5.7l-1 1M13 18l-1 1a4 4 0 01-5.7-5.7l1-1" />
         </ToolButton>
         <ToolButton
+          label={spotlight ? 'Spotlight is on: other branches are faded. Click to show everything equally' : 'Spotlight the current branch (fade the others)'}
+          active={spotlight}
+          onClick={() => {
+            setSpotlight(!spotlight);
+            try {
+              localStorage.setItem(SPOTLIGHT_KEY, spotlight ? 'off' : 'on');
+            } catch {
+              /* storage unavailable */
+            }
+          }}
+        >
+          <circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" />
+        </ToolButton>
+        <ToolButton
           label={minimap ? 'Hide the minimap' : 'Show the minimap'}
           active={minimap}
           onClick={() => {
@@ -329,6 +369,7 @@ function Canvas() {
       </Panel>
 
       <Panel position="bottom-center"><ZoomPill /></Panel>
+      <Panel position="bottom-left"><LeftChip /></Panel>
       <ContextMenuHost anyPinned={anyPinned} />
       {minimap && (
         <MiniMap

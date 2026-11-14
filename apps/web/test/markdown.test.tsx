@@ -14,6 +14,16 @@ afterEach(() => {
 });
 
 describe('Markdown', () => {
+  it('a link inside bold, as at the start of a list item, is still a link, and the list renders as list items', () => {
+    const { container } = render(<Markdown fromNodeId="r" text={'Kinds:\n\n- **[[CNN]]:** one\n- **[[Pooling]]:** two\n\nKeep **millimetres** in mind.'} />);
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+    const cnn = screen.getByText('CNN') as HTMLElement;
+    expect(cnn.dataset.existing).toBe('true');
+    expect(cnn.closest('strong')).not.toBeNull();
+    expect((screen.getByText('Pooling') as HTMLElement).dataset.existing).toBe('false');
+    expect(container.querySelector('strong:not(:has(button))')?.textContent).toBe('millimetres');
+  });
+
   it('draws existing concepts and ghost links differently, matching by alias and plural', () => {
     render(<Markdown fromNodeId="r" text="See [[CNN]], [[Channels]], [[Transformer|attention nets]] and [[Pooling]]." />);
     const q = (t: string) => screen.getByText(t) as HTMLElement;

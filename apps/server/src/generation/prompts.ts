@@ -10,6 +10,7 @@ Rules:
 - Link each concept once, at its first mention. Do not link the concept you are explaining.
 - Define in a few words any technical term that you do not link.
 - Write Markdown. No title heading, no preamble, no closing remarks or offers of more help.
+- Make it scannable: put **bold** on the two to four phrases a learner should remember, and on the name at the start of each list item (for example "- **Prime:** one fixed focal length"). Do not bold whole sentences.
 - Use $...$ for inline math and $$...$$ for display math. Use fenced code blocks for code.
 - Answer from your own knowledge. Do not run commands, read files or browse.`;
 
@@ -22,6 +23,10 @@ export const LEVEL_TEXT: Record<Level, string> = {
 
 export type PromptKind = 'root' | 'expand' | 'ask';
 
+/** Without this the model names only the commonest kinds of a thing, and a beginner never learns the rest exist. */
+const KINDS_RULE = `
+Exception, which overrides the 3 to 5 limit: if this concept has a well-known set of kinds, types or variants (for example the sizes of a camera sensor), name every main one in the explanation as a [[link]], a few words each, and list every one of them in children, up to 8, before any other child. The explanation may then run to 260 words.`;
+
 function expandFormat(root: boolean): string {
   const [minW, maxW, minC, maxC] = root ? [150, 220, 4, 7] : [120, 200, 3, 5];
   return `Output format, exactly:
@@ -29,7 +34,7 @@ function expandFormat(root: boolean): string {
 2. A line containing only ===META===
 3. One JSON object, with no code fence and nothing after it:
 {"summary": "<one sentence, at most 25 words>", "aliases": ["<other common names or abbreviations, at most 6>"], "children": [{"title": "<concept name>", "summary": "<one sentence, at most 25 words>"}]}
-children: the ${minC} to ${maxC} concepts to open next in order to understand this one more deeply, most important first. Each must be a part, mechanism or direct prerequisite of this concept, not one of its ancestors. Link each child in the explanation where it fits naturally.`;
+children: the ${minC} to ${maxC} concepts to open next in order to understand this one more deeply, most important first. Each must be a part, mechanism or direct prerequisite of this concept, not one of its ancestors. Link each child in the explanation where it fits naturally.${root ? '' : KINDS_RULE}`;
 }
 
 const ASK_FORMAT = `Output format, exactly:

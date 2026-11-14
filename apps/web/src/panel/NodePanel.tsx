@@ -60,7 +60,7 @@ function NodeMenu({ node }: { node: ConceptNode }) {
 
   return (
     <div className="relative" data-node-menu>
-      <button className="btn btn-sm" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} aria-label="Node actions">⋯</button>
+      <button className="btn btn-sm btn-more" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} aria-label="Node actions">⋯</button>
       {open && (
         <div className="menu">
           <MenuList entries={nodeMenu(map, index, node, { busy, streaming })} onDone={() => setOpen(false)} label="Node actions" />
@@ -111,7 +111,7 @@ export function NodePanel() {
         <NodeMenu node={node} />
       </header>
 
-      <div ref={scroll} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div ref={scroll} className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-5">
         <div className="sr-only" aria-live="polite">{node.status === 'ready' ? `${node.title} is ready.` : ''}</div>
         {generating ? (
           <>
@@ -139,10 +139,10 @@ export function NodePanel() {
         <SelectionPopover container={scroll} nodeId={node.id} />
 
         {children.length > 0 && (
-          <section className="mt-6"><h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide muted">Next concepts</h3><div className="flex flex-wrap gap-2">{children.map(chip)}</div></section>
+          <section className="mt-9"><h3 className="m-0 mb-3 text-xs font-semibold uppercase tracking-wide muted">Next concepts</h3><div className="flex flex-wrap gap-2">{children.map(chip)}</div></section>
         )}
         {ghosts.length > 0 && (
-          <section className="mt-5" aria-label="Mentioned but not added">
+          <section className="mt-7" aria-label="Mentioned but not added">
             <h3 className="m-0 mb-2 flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide muted">
               <span>Mentioned, no card yet</span>
               <button className="btn btn-sm normal-case tracking-normal" onClick={() => void useStore.getState().adoptGhosts(node.id)}>
@@ -159,10 +159,10 @@ export function NodePanel() {
           </section>
         )}
         {related.length > 0 && (
-          <section className="mt-5"><h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide muted">See also</h3><div className="flex flex-wrap gap-2">{related.map(chip)}</div></section>
+          <section className="mt-7"><h3 className="m-0 mb-3 text-xs font-semibold uppercase tracking-wide muted">See also</h3><div className="flex flex-wrap gap-2">{related.map(chip)}</div></section>
         )}
         {mentioned.length > 0 && (
-          <section className="mt-5"><h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide muted">Mentioned in</h3><div className="flex flex-wrap gap-2">{mentioned.map(chip)}</div></section>
+          <section className="mt-7"><h3 className="m-0 mb-3 text-xs font-semibold uppercase tracking-wide muted">Mentioned in</h3><div className="flex flex-wrap gap-2">{mentioned.map(chip)}</div></section>
         )}
         <Thread node={node} />
       </div>

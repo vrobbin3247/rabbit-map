@@ -445,7 +445,7 @@ test('right-click menu on a node: select, add a child, navigate, release a dragg
   const a = node(page, 'Menus Part A');
 
   // right-click selects the node and opens its menu
-  await a.click({ button: 'right' });
+  await a.click({ button: 'right', position: { x: 190, y: 30 } });
   await expect(menu(page)).toBeVisible();
   await expect(panel(page).getByRole('heading', { name: 'Menus Part A' })).toBeVisible();
   await expect(item(page, 'Explain')).toBeVisible();
@@ -456,7 +456,7 @@ test('right-click menu on a node: select, add a child, navigate, release a dragg
   await expect(menu(page)).toHaveCount(0);
 
   // Add child concept: a stub, not explained, no model call
-  await a.click({ button: 'right' });
+  await a.click({ button: 'right', position: { x: 190, y: 30 } });
   await item(page, /^Add child concept/).click();
   await page.getByRole('dialog').getByRole('textbox').fill('Custom Idea');
   await page.keyboard.press('Enter');
@@ -465,7 +465,7 @@ test('right-click menu on a node: select, add a child, navigate, release a dragg
   await expect(node(page, 'Custom Idea')).toBeVisible();
 
   // an existing name opens the existing node instead of duplicating it
-  await a.click({ button: 'right' });
+  await a.click({ button: 'right', position: { x: 190, y: 30 } });
   await item(page, /^Add child concept/).click();
   await page.getByRole('dialog').getByRole('textbox').fill('menus part b');
   await page.keyboard.press('Enter');
@@ -487,7 +487,7 @@ test('right-click menu on a node: select, add a child, navigate, release a dragg
   await page.mouse.move(box.x + 120, box.y + 120, { steps: 6 });
   await page.mouse.up();
   await expect.poll(async () => Math.round((await a.boundingBox())!.x - box.x)).toBeGreaterThan(60); // it really moved
-  await a.click({ button: 'right' });
+  await a.click({ button: 'right', position: { x: 190, y: 30 } });
   await expect(item(page, 'Release position')).toBeVisible(); // so there is something to release
   await item(page, 'Release position').click();
   const mapId = ((await (await request.get('/api/maps')).json()).maps as { id: string; title: string }[]).find((m) => m.title === 'Menus')!.id;
@@ -555,6 +555,28 @@ test('AI settings: one button opens a themed menu; the custom dropdown changes t
   await page.reload();
   await page.getByRole('button', { name: /Settings/ }).first().click();
   await expect(page.getByRole('button', { name: /· advanced$/ })).toBeVisible();
+});
+
+test('spotlight: other branches fade, the current path and its neighbours stay clear, and it can be turned off', async ({ page }) => {
+  await create(page, 'Spot');
+  await written(page);
+  for (const t of ['Spot Part A', 'Spot Part B']) {
+    await node(page, t).click();
+    await panel(page).getByRole('button', { name: 'Explain' }).click();
+    await written(page);
+  }
+  await node(page, 'Spot Part A').click();
+  // children of the other branch are off the path and not neighbours: faded
+  await expect(node(page, 'Spot Part B Part A')).toHaveClass(/dim/);
+  // the path, the selected card's children and the root's other children are not
+  await expect(node(page, 'Spot Part A Part A')).not.toHaveClass(/dim/);
+  await expect(node(page, 'Spot Part B')).not.toHaveClass(/dim/);
+  await expect(node(page, 'Spot')).not.toHaveClass(/dim/);
+  // pointing at a faded card brings it back, and the toggle shows everything equally
+  await page.getByRole('button', { name: /^Spotlight is on/ }).click();
+  await expect(page.locator('.cnode.dim')).toHaveCount(0);
+  await page.getByRole('button', { name: /^Spotlight the current branch/ }).click();
+  await expect(node(page, 'Spot Part B Part A')).toHaveClass(/dim/);
 });
 
 test('theme toggle: light, dark, system; remembered; the board follows', async ({ page }) => {

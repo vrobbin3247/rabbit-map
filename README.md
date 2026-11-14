@@ -73,6 +73,7 @@ npm run test:e2e     # rebuilds, then drives the app in a real browser with a fa
 npm run smoke -- claude [--model haiku]            # one real call, prints timings
 npm run smoke -- codex
 npm run smoke -- claude --ask "what are the kinds of padding"
+npm run smoke -- claude --expand "Sensor Size"     # an explanation of a concept with a set of kinds
 npm run test:real    # drives the browser against real Claude (3 calls)
 ```
 

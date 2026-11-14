@@ -3,6 +3,7 @@
  *   npm run smoke -- claude [--model haiku] [--record file.jsonl]
  *   npm run smoke -- codex
  *   npm run smoke -- claude --ask "what are different paddings"   (a question on a Padding node)
+ *   npm run smoke -- claude --expand "Sensor Size"   (explain a concept that has a set of kinds)
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -65,6 +66,27 @@ if (askQuestion) {
   console.log('cross-links (See also):', m.nodes[padding.id]?.related.map((i) => m.nodes[i]?.title));
   const links = [...parsed.text.matchAll(/\[\[([^\]|]+)/g)].map((x) => x[1]);
   console.log('links in answer:', links, ' all resolve to nodes:', links.every((l) => Object.values(m.nodes).some((n) => n.title.toLowerCase() === (l ?? '').toLowerCase())));
+  process.exit(0);
+}
+
+// An explanation of a concept that has a well-known set of kinds: do we get the whole set, or only the commonest?
+const expandConcept = flag('--expand');
+if (expandConcept) {
+  const m = createMap('Photography', { level: 'beginner', goal: 'I want to take photography as a hobby', provider: id, model: flag('--model') ?? null });
+  const gen = { provider: id, model: null, at: '', durationMs: 0, metaRecovered: false };
+  startExpand(m, m.rootId);
+  finishExpand(m, m.rootId, { body: 'Overview.', summary: 'Taking photographs.', aliases: [], children: [{ title: 'Image Sensor', summary: 'The chip that records light.' }, { title: 'Lens', summary: 'Focuses light.' }], metaRecovered: false }, gen);
+  const sensor = Object.values(m.nodes).find((n) => n.title === 'Image Sensor')!;
+  startExpand(m, sensor.id);
+  finishExpand(m, sensor.id, { body: 'The image sensor is the chip behind the lens that records light.', summary: 'The chip that records light.', aliases: [], children: [{ title: 'Pixel', summary: 'One light-sensitive spot.' }, { title: 'Dynamic Range', summary: 'Darkest to brightest detail.' }], metaRecovered: false }, gen);
+  const target = openConcept(m, sensor.id, expandConcept).node;
+  const { system, prompt } = buildExpandPrompt(m, target.id);
+  const result = await provider.generate({ system, prompt, model: m.settings.model, signal: new AbortController().signal });
+  const index = buildIndex(m);
+  const parsed = parseExpandOutput(result.text, target.title, target.aliases, (n) => resolve(index, n));
+  console.log('\n--- EXPLANATION ---\n' + parsed.body);
+  console.log(`\n--- RESULT ---\ntotal: ${(result.durationMs / 1000).toFixed(1)}s   words: ${parsed.body.split(/\s+/).length}   tokens:`, result.usage);
+  console.log('children:', parsed.children.map((c) => c.title));
   process.exit(0);
 }
 
