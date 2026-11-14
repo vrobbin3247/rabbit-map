@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # Unit, integration and component tests. They use a fake AI provider and stand-in CLIs,
+      # so no Claude or ChatGPT login is needed and no plan quota is spent.
+      - name: Test
+        run: npm test
+
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      # Builds the web app, starts the server with the fake provider, drives it in Chromium.
+      - name: Browser tests
+        run: npm run test:e2e
+
+      - name: Keep browser test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
