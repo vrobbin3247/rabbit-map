@@ -57,6 +57,11 @@ export function MapView() {
         return;
       }
       if (document.querySelector('[data-context-menu]')) return;
+      // Cmd/Ctrl+Z undoes the last delete or merge, unless the learner is typing (then it undoes their typing).
+      if (mod && !e.shiftKey && e.key.toLowerCase() === 'z' && !typing(e.target) && st.undo) {
+        e.preventDefault();
+        return void st.undoLast();
+      }
       if (e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault();
         return st.back();
@@ -102,6 +107,18 @@ export function MapView() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // When the window becomes narrow, give the board the room: collapse the trail. (It stays the
+  // learner's choice to open it again, and widening the window does not reopen it.)
+  useEffect(() => {
+    const mq = window.matchMedia?.('(max-width: 859px)');
+    if (!mq) return;
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) useStore.getState().set({ trailOpen: false });
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   const startDrag = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     const move = (ev: PointerEvent) => setWidth(Math.min(800, Math.max(320, window.innerWidth - ev.clientX)));
@@ -125,17 +142,25 @@ export function MapView() {
     <div className="flex h-full flex-col">
       <Banners />
       <TopBar />
-      <div className="flex min-h-0 flex-1">
-        <main className="relative min-w-0 flex-1" aria-label="Map">
-          <MapCanvas />
+      {/* Wide: board and panel side by side. Narrow (under 860 px): the panel moves below the board. */}
+      <div className="flex min-h-0 flex-1 flex-col min-[860px]:flex-row">
+        <div className="flex min-h-0 min-w-0 flex-1">
           <Trail />
-        </main>
-        <div role="separator" aria-orientation="vertical" aria-label="Resize panel" tabIndex={0} className="w-1.5 shrink-0 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" onPointerDown={startDrag}
+          <main className="relative min-h-0 min-w-0 flex-1" aria-label="Map">
+            <MapCanvas />
+          </main>
+        </div>
+        <div role="separator" aria-orientation="vertical" aria-label="Resize panel" tabIndex={0} className="hidden w-1.5 shrink-0 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)] min-[860px]:block" onPointerDown={startDrag}
           onKeyDown={(e) => {
             if (e.key === 'ArrowLeft') setWidth((w) => Math.min(800, w + 20));
             if (e.key === 'ArrowRight') setWidth((w) => Math.max(320, w - 20));
           }} />
-        <div style={{ width }} className="min-h-0 shrink-0"><NodePanel /></div>
+        <div
+          style={{ '--panel-w': `${width}px` } as React.CSSProperties}
+          className="h-[46%] min-h-0 shrink-0 border-t border-[var(--border)] min-[860px]:h-auto min-[860px]:w-[min(var(--panel-w),55vw)] min-[860px]:border-t-0"
+        >
+          <NodePanel />
+        </div>
       </div>
       {searchOpen && <SearchPalette />}
       <NodeDialogs />

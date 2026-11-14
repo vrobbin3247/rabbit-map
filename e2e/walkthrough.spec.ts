@@ -134,6 +134,159 @@ test('a question that names kinds of a concept adds them as nodes on the board',
   await expect(page.getByRole('navigation', { name: 'Path from the root' })).toContainText('Padding Part A');
 });
 
+type Box = { x: number; y: number; width: number; height: number };
+const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/** Titles of nodes that sit under the floating tools or trail. */
+async function nodesUnderOverlays(page: Page): Promise<string[]> {
+  const overlays = [(await page.locator('.toolbar').boundingBox())!, (await page.getByRole('navigation', { name: 'Trail' }).boundingBox())!];
+  const hidden: string[] = [];
+  for (const el of await page.locator('.react-flow__node').all()) {
+    const b = (await el.boundingBox())!;
+    if (overlays.some((o) => overlaps(b, o))) hidden.push((await el.innerText()).split('\n')[0]!);
+  }
+  return hidden;
+}
+
+test('Fit and jumping to a far node keep nodes clear of the floating toolbar and trail', async ({ page }) => {
+  await create(page, 'Layout');
+  await written(page);
+  // grow the map to a few levels and many nodes
+  for (const t of ['Layout Part A', 'Layout Part B', 'Layout Part C']) {
+    await node(page, t).click();
+    await panel(page).getByRole('button', { name: 'Explain' }).click();
+    await written(page);
+  }
+  await node(page, 'Layout Part A Part A').click();
+  await panel(page).getByRole('button', { name: 'Explain' }).click();
+  await written(page);
+
+  await page.getByRole('button', { name: 'Fit the whole map' }).click();
+  await page.waitForTimeout(500);
+  expect(await nodesUnderOverlays(page)).toEqual([]);
+
+  // pan the board far away, then jump to a node with search: it must land in the free area
+  await page.mouse.move(700, 400);
+  await page.mouse.down();
+  await page.mouse.move(100, 120, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.getByRole('combobox', { name: 'Find a node' }).fill('layout part a part a part b');
+  await page.keyboard.press('Enter');
+  await expect(panel(page).getByRole('heading', { name: /Layout Part A Part A Part B/ })).toBeVisible();
+  await page.waitForTimeout(500);
+  const b = (await page.getByRole('button', { name: /^Layout Part A Part A Part B\./ }).boundingBox())!;
+  const main = (await page.getByRole('main').boundingBox())!;
+  expect(b.x).toBeGreaterThanOrEqual(main.x + 84); // right of the tool strip
+  expect(b.x + b.width).toBeLessThanOrEqual(main.x + main.width);
+  expect(b.y).toBeGreaterThanOrEqual(main.y);
+  expect(await nodesUnderOverlays(page).then((l) => l.filter((t) => t.startsWith('Layout Part A Part A Part B')))).toEqual([]);
+});
+
+test('keyboard navigation while zoomed in keeps the selected node in the free area, clear of the tools', async ({ page }) => {
+  await create(page, 'Rapid');
+  await written(page);
+  for (const t of ['Rapid Part A', 'Rapid Part B', 'Rapid Part C']) {
+    await node(page, t).click();
+    await panel(page).getByRole('button', { name: 'Explain' }).click();
+    await written(page);
+  }
+  // zoom in, so that moving between nodes needs the board to move each time
+  await page.getByRole('button', { name: 'Fit the whole map' }).click();
+  for (let i = 0; i < 4; i++) {
+    await page.getByRole('button', { name: 'Zoom in' }).click();
+    await page.waitForTimeout(200);
+  }
+  await page.locator('.react-flow').click({ position: { x: 400, y: 20 } });
+  // walk down the tree as fast as the keyboard can: each press starts a new centring while the last is still moving
+  await page.keyboard.press('a'); // go to the anchor (the root); the board centres it
+  await page.waitForTimeout(500);
+  // 30 ms apart, from inside the page: Playwright's own key presses are too slow to overlap the animation.
+  await page.evaluate(async () => {
+    for (const key of ['ArrowRight', 'ArrowDown', 'ArrowDown', 'ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowRight']) {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      await new Promise((r) => setTimeout(r, 30));
+    }
+  });
+  await page.waitForTimeout(700);
+  const title = (await panel(page).getByRole('heading', { level: 2 }).innerText()).trim();
+  const b = (await page.getByRole('button', { name: new RegExp(`^${title}\\.`) }).boundingBox())!;
+  const main = (await page.getByRole('main').boundingBox())!;
+  expect(b.x, `${title} is clear of the tool strip`).toBeGreaterThanOrEqual(main.x + 84);
+  expect(b.x + b.width, `${title} is not cut off on the right`).toBeLessThanOrEqual(main.x + main.width + 1);
+  expect(b.y).toBeGreaterThanOrEqual(main.y);
+  expect(b.y + b.height).toBeLessThanOrEqual(main.y + main.height);
+});
+
+test('responsive: side by side when wide, panel below the board when narrow', async ({ page }) => {
+  await create(page, 'Narrow');
+  await written(page);
+  const main = page.getByRole('main');
+  const aside = panel(page);
+
+  // wide: the panel is to the right of the board
+  let m = (await main.boundingBox())!;
+  let a = (await aside.boundingBox())!;
+  expect(a.x).toBeGreaterThanOrEqual(m.x + m.width - 2);
+  expect(await page.getByRole('separator', { name: 'Resize panel' }).isVisible()).toBe(true);
+
+  // narrow: below the board, full width, the resize handle is gone, and the ask box is still reachable
+  await page.setViewportSize({ width: 700, height: 800 });
+  await page.waitForTimeout(300);
+  m = (await main.boundingBox())!;
+  a = (await aside.boundingBox())!;
+  expect(a.y).toBeGreaterThanOrEqual(m.y + m.height - 2);
+  expect(Math.round(m.width)).toBeGreaterThanOrEqual(640); // the board, beside the slim collapsed trail
+  expect(Math.round(a.width)).toBeGreaterThanOrEqual(680);
+  expect(await page.getByRole('separator', { name: 'Resize panel' }).isVisible()).toBe(false);
+  await expect(aside.getByPlaceholder(/^Ask about/)).toBeVisible();
+  const ask = (await aside.getByPlaceholder(/^Ask about/).boundingBox())!;
+  expect(ask.y + ask.height).toBeLessThanOrEqual(800);
+  // the page itself does not scroll sideways
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/narrow.png' });
+});
+
+test('undo a delete and a merge from the message and from the keyboard', async ({ page }) => {
+  await create(page, 'Undo');
+  await written(page);
+  await node(page, 'Undo Part A').click();
+  await panel(page).getByRole('button', { name: 'Explain' }).click();
+  await written(page);
+  const before = await page.locator('.react-flow__node').count();
+
+  // delete a branch from the menu, then press Undo on the message
+  await node(page, 'Undo Part A').click({ button: 'right' });
+  await item(page, /^Delete/).click();
+  await page.getByRole('dialog').getByRole('button', { name: /^Delete 4 nodes/ }).click();
+  await expect(page.getByText('Deleted “Undo Part A” and 3 below it')).toBeVisible();
+  await expect(node(page, 'Undo Part A')).toHaveCount(0);
+  expect(await page.locator('.react-flow__node').count()).toBeLessThan(before);
+  await page.getByRole('status').getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByText('Undone: Deleted “Undo Part A” and 3 below it.')).toBeVisible();
+  await expect(node(page, 'Undo Part A')).toBeVisible();
+  await expect(node(page, 'Undo Part A Part A')).toBeVisible();
+  expect(await page.locator('.react-flow__node').count()).toBe(before);
+
+  // merge, then undo with Ctrl/Cmd+Z
+  await node(page, 'Undo Part B').click({ button: 'right' });
+  await item(page, /^Merge into/).click();
+  await page.getByRole('dialog').getByRole('textbox').fill('Part C');
+  await page.getByRole('dialog').getByRole('button', { name: 'Undo Part C' }).click();
+  await expect(node(page, 'Undo Part B')).toHaveCount(0);
+  await expect(page.getByText(/^Merged “Undo Part B” into “Undo Part C”/)).toBeVisible();
+  await page.locator('.react-flow').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(node(page, 'Undo Part B')).toBeVisible();
+  await expect(node(page, 'Undo Part C')).toBeVisible();
+
+  // it survives a reload (the restored map was saved)
+  await page.waitForTimeout(900);
+  await page.reload();
+  await page.getByRole('button', { name: /Undo/ }).first().click();
+  await expect(node(page, 'Undo Part B')).toBeVisible();
+});
+
 test('drag a node: it moves, stays put after reload, its unplaced branch follows, Tidy up resets', async ({ page, request }) => {
   await create(page, 'Dragging');
   await written(page);
@@ -225,13 +378,18 @@ test('right-click menu on a node: select, add a child, navigate, release a dragg
   await item(page, 'Go to parent').click();
   await expect(panel(page).getByRole('heading', { name: 'Menus Part A' })).toBeVisible();
 
-  // drag a node, then release it from the menu
+  // Drag a node, then release it from the menu. This test is also the guard for a centring race: a
+  // selection made while the board was still moving used to skip centring, leaving nodes under the
+  // tool strip (it fails 6 of 6 runs without the fix). Let the board finish moving before the press.
+  await page.waitForTimeout(500);
   const box = (await a.boundingBox())!;
   await page.mouse.move(box.x + 40, box.y + 30);
   await page.mouse.down();
   await page.mouse.move(box.x + 120, box.y + 120, { steps: 6 });
   await page.mouse.up();
+  await expect.poll(async () => Math.round((await a.boundingBox())!.x - box.x)).toBeGreaterThan(60); // it really moved
   await a.click({ button: 'right' });
+  await expect(item(page, 'Release position')).toBeVisible(); // so there is something to release
   await item(page, 'Release position').click();
   const mapId = ((await (await request.get('/api/maps')).json()).maps as { id: string; title: string }[]).find((m) => m.title === 'Menus')!.id;
   await expect.poll(async () => Object.values((await (await request.get(`/api/maps/${mapId}`)).json()).map.nodes as Record<string, { position?: unknown }>).filter((n) => n.position).length).toBe(0);

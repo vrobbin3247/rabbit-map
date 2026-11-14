@@ -487,6 +487,127 @@ describe('positions', () => {
   });
 });
 
+describe('undo', () => {
+  async function built() {
+    const map = await newMap('Topic');
+    await env.stream(`/api/maps/${map.id}/nodes/${map.rootId}/expand`);
+    let m = await getMap(map.id);
+    const a = byTitle(m, 'Topic Part A');
+    await env.stream(`/api/maps/${map.id}/nodes/${a.id}/expand`);
+    await env.stream(`/api/maps/${map.id}/nodes/${a.id}/ask`, { question: 'a question' });
+    m = await getMap(map.id);
+    return { map, m, a };
+  }
+  const undo = (mapId: string, undoId: string) => env.json('POST', `/api/maps/${mapId}/undo`, { undoId });
+
+  it('undoing a delete restores every node exactly, its references, and the view', async () => {
+    const { map, m, a } = await built();
+    const shared = byTitle(m, 'Shared Concept');
+    await env.json('PATCH', `/api/maps/${map.id}/positions`, { positions: { [a.id]: { x: 12, y: 34 } } });
+    const deep = byTitle(await getMap(map.id), 'Topic Part A Part A');
+    await env.json('PATCH', `/api/maps/${map.id}/view`, { selectedId: deep.id, anchorId: a.id, trail: [map.rootId, a.id, deep.id] });
+    const before = await getMap(map.id);
+
+    // delete a node that others cross-link to, then a whole branch
+    const d1 = await env.json('DELETE', `/api/maps/${map.id}/nodes/${shared.id}`);
+    expect(d1.body.undo.label).toBe('Deleted “Shared Concept”');
+    const d2 = await env.json('DELETE', `/api/maps/${map.id}/nodes/${a.id}`);
+    expect(d2.body.undo.label).toBe('Deleted “Topic Part A” and 3 below it');
+    expect((await getMap(map.id)).nodes[a.id]).toBeUndefined();
+
+    // undo in reverse order
+    const u2 = await undo(map.id, d2.body.undo.id);
+    expect(u2.status).toBe(200);
+    expect(u2.body.map.nodes[a.id].position).toEqual({ x: 12, y: 34 });
+    const u1 = await undo(map.id, d1.body.undo.id);
+    expect(u1.status).toBe(200);
+
+    const after = await getMap(map.id);
+    expect(after.nodes).toEqual(before.nodes); // every node, thread, cross-link and position, exactly
+    expect(after.view.anchorId).toBe(a.id);
+    expect(after.view.selectedId).toBe(deep.id);
+    expect(after.view.trail).toEqual([map.rootId, a.id, deep.id]);
+    expectValid(after);
+    await env.store.flush();
+    expect((await new MapStore(env.config.mapsDir).get(map.id)).nodes).toEqual(before.nodes); // and it was saved
+
+    // each undo can be used once
+    expect((await undo(map.id, d2.body.undo.id)).status).toBe(404);
+  });
+
+  it('undoing a merge restores both nodes, the threads, and the children', async () => {
+    const { map, m, a } = await built();
+    const b = byTitle(m, 'Topic Part B');
+    await env.stream(`/api/maps/${map.id}/nodes/${b.id}/ask`, { question: 'in b' });
+    const before = await getMap(map.id);
+    const r = await env.json('POST', `/api/maps/${map.id}/nodes/${a.id}/merge`, { intoId: b.id });
+    expect(r.body.undo.label).toBe('Merged “Topic Part A” into “Topic Part B”');
+    const merged = await getMap(map.id);
+    expect(merged.nodes[a.id]).toBeUndefined();
+    expect(merged.nodes[b.id]!.thread.length).toBeGreaterThan(before.nodes[b.id]!.thread.length);
+
+    expect((await undo(map.id, r.body.undo.id)).status).toBe(200);
+    const after = await getMap(map.id);
+    expect(after.nodes).toEqual(before.nodes);
+    expect(after.view).toEqual({ ...before.view, viewport: after.view.viewport });
+    expectValid(after);
+  });
+
+  it('keeps work done elsewhere after the action', async () => {
+    const { map, m } = await built();
+    const c = byTitle(m, 'Topic Part C');
+    const b = byTitle(m, 'Topic Part B');
+    const d = await env.json('DELETE', `/api/maps/${map.id}/nodes/${c.id}`);
+    await env.stream(`/api/maps/${map.id}/nodes/${b.id}/expand`); // unrelated work afterwards
+    expect((await undo(map.id, d.body.undo.id)).status).toBe(200);
+    const after = await getMap(map.id);
+    expect(after.nodes[c.id]).toBeTruthy();
+    expect(after.nodes[b.id]?.status).toBe('ready'); // still explained
+    expectValid(after);
+  });
+
+  it('refuses, and changes nothing, when a node it touched has changed since', async () => {
+    const { map, m, a } = await built();
+    const shared = byTitle(m, 'Shared Concept');
+    const d = await env.json('DELETE', `/api/maps/${map.id}/nodes/${shared.id}`); // also cleans Part A's cross-link
+    await env.json('PATCH', `/api/maps/${map.id}/nodes/${a.id}`, { title: 'Alpha' });
+    const before = await getMap(map.id);
+    const r = await undo(map.id, d.body.undo.id);
+    expect(r.status).toBe(409);
+    expect(r.body.error.message).toContain('changed after that');
+    expect((await getMap(map.id)).nodes).toEqual(before.nodes);
+  });
+
+  it('refuses when a node with the same name now exists, and works once that is resolved', async () => {
+    const { map, m } = await built();
+    const c = byTitle(m, 'Topic Part C');
+    const d = await env.json('DELETE', `/api/maps/${map.id}/nodes/${c.id}`);
+    const created = await env.json('POST', `/api/maps/${map.id}/nodes`, { fromNodeId: map.rootId, term: 'Topic Part C' });
+    expect(created.status).toBe(201);
+    const refused = await undo(map.id, d.body.undo.id);
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.message).toContain('now exists');
+    // the refused undo is still available: remove the clash and try again
+    await env.json('DELETE', `/api/maps/${map.id}/nodes/${created.body.node.id}`);
+    expect((await undo(map.id, d.body.undo.id)).status).toBe(200);
+    expect((await getMap(map.id)).nodes[c.id]).toBeTruthy();
+  });
+
+  it('rejects unknown ids and malformed bodies', async () => {
+    const map = await newMap();
+    expect((await undo(map.id, 'nope')).status).toBe(404);
+    expect((await env.json('POST', `/api/maps/${map.id}/undo`, {})).status).toBe(400);
+    expect((await env.json('POST', `/api/maps/${map.id}/undo`, { undoId: 'x', extra: 1 })).status).toBe(400);
+  });
+
+  it('an undo id from one map does not work on another', async () => {
+    const one = await built();
+    const other = await newMap('Other');
+    const d = await env.json('DELETE', `/api/maps/${one.map.id}/nodes/${byTitle(one.m, 'Topic Part C').id}`);
+    expect((await undo(other.id, d.body.undo.id)).status).toBe(404);
+  });
+});
+
 describe('export safety', () => {
   const exportTitled = async (title: string) => {
     const m = (await env.json('POST', '/api/maps', { topic: title })).body.map;

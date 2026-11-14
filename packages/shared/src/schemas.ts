@@ -154,6 +154,8 @@ export const PatchPositionsBodySchema = z
   })
   .strict();
 
+export const UndoBodySchema = z.object({ undoId: z.string() }).strict();
+
 export const MergeBodySchema = z.object({ intoId: z.string() }).strict();
 
 export const ExpandBodySchema = z.object({ regenerate: z.boolean().optional() }).strict();

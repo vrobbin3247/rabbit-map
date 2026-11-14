@@ -29,6 +29,8 @@ export interface Banner {
   kind: 'error' | 'info';
   text: string;
   sticky?: boolean;
+  /** A button on the message, such as Undo. */
+  action?: { label: string; run: () => void };
 }
 
 export type NodeDialog = { kind: 'rename' | 'merge' | 'delete' | 'addChild'; id: string };
@@ -54,6 +56,8 @@ interface Store {
   askFocusTick: number;
   ctxMenu: CtxMenu | null;
   nodeDialog: NodeDialog | null;
+  /** The last delete or merge, which can be undone. */
+  undo: { id: string; label: string } | null;
 
   init(): Promise<void>;
   loadHealth(refresh?: boolean): Promise<void>;
@@ -82,6 +86,7 @@ interface Store {
   deleteNode(id: string): Promise<void>;
   mergeNode(id: string, intoId: string): Promise<boolean>;
   toggleCollapse(id: string): Promise<void>;
+  undoLast(): Promise<void>;
   /** Pin nodes at positions, or release them with null. */
   moveNodes(positions: Record<string, { x: number; y: number } | null>): Promise<void>;
   unpinNode(id: string): Promise<void>;
@@ -123,6 +128,12 @@ export const useStore = create<Store>()((set, get) => {
     const removed = new Set(c.removedIds);
     set({ forward: get().forward.filter((f) => !removed.has(f)) });
     setMap({ ...m, nodes, view: c.view });
+  };
+
+  /** After a delete or merge: remember how to reverse it and say so, with an Undo button. */
+  const offerUndo = (u: { id: string; label: string } | undefined) => {
+    if (!u) return;
+    set({ undo: u, banner: { kind: 'info', text: u.label, action: { label: 'Undo', run: () => void get().undoLast() } } });
   };
 
   const patchView = (patch: object) => {
@@ -211,12 +222,13 @@ export const useStore = create<Store>()((set, get) => {
     streams: {},
     banner: null,
     showAllCrossLinks: false,
-    trailOpen: true,
+    trailOpen: typeof window === 'undefined' ? true : window.innerWidth >= 860,
     searchOpen: false,
     askQuote: null,
     askFocusTick: 0,
     ctxMenu: null,
     nodeDialog: null,
+    undo: null,
 
     async init() {
       await Promise.all([get().loadHealth(), get().loadMaps()]);
@@ -249,7 +261,7 @@ export const useStore = create<Store>()((set, get) => {
       try {
         const { map } = await api.getMap(id);
         for (const a of aborters.values()) a.abort();
-        set({ forward: [], streams: {}, banner: null, askQuote: null });
+        set({ forward: [], streams: {}, banner: null, askQuote: null, undo: null });
         setMap(map);
         void get().loadHealth();
       } catch (e) {
@@ -258,7 +270,7 @@ export const useStore = create<Store>()((set, get) => {
     },
     async closeMap() {
       for (const a of aborters.values()) a.abort();
-      set({ map: null, index: null, forward: [], streams: {} });
+      set({ map: null, index: null, forward: [], streams: {}, undo: null });
       await get().loadMaps();
     },
     async renameMap(id, title) {
@@ -383,7 +395,9 @@ export const useStore = create<Store>()((set, get) => {
       const m = get().map;
       if (!m) return;
       try {
-        applyChanges(await api.deleteNode(m.id, id));
+        const r = await api.deleteNode(m.id, id);
+        applyChanges(r);
+        offerUndo(r.undo);
       } catch (e) {
         fail(e);
       }
@@ -392,7 +406,9 @@ export const useStore = create<Store>()((set, get) => {
       const m = get().map;
       if (!m) return false;
       try {
-        applyChanges(await api.mergeNode(m.id, id, intoId));
+        const r = await api.mergeNode(m.id, id, intoId);
+        applyChanges(r);
+        offerUndo(r.undo);
         return true;
       } catch (e) {
         fail(e);
@@ -438,6 +454,22 @@ export const useStore = create<Store>()((set, get) => {
       } catch (e) {
         fail(e);
         await refreshMap();
+      }
+    },
+    async undoLast() {
+      const m = get().map;
+      const u = get().undo;
+      if (!m || !u) return;
+      try {
+        const r = await api.undo(m.id, u.id);
+        const nodes = r.map.nodes;
+        set({ undo: null, forward: get().forward.filter((f) => nodes[f]) });
+        setMap(r.map);
+        set({ banner: { kind: 'info', text: `Undone: ${r.label}.` } });
+      } catch (e) {
+        // A refused undo (the nodes changed) stays on the server, but this one has expired if it is gone.
+        if (e instanceof ApiError && e.code === 'not_found') set({ undo: null });
+        fail(e);
       }
     },
     async deleteMessage(nodeId, messageId) {

@@ -8,7 +8,8 @@ export function Banners() {
 
   useEffect(() => {
     if (!banner || banner.sticky) return;
-    const t = window.setTimeout(() => useStore.getState().setBanner(null), 9000);
+    // A message with a button (Undo) stays longer, so there is time to use it.
+    const t = window.setTimeout(() => useStore.getState().setBanner(null), banner.action ? 15000 : 9000);
     return () => window.clearTimeout(t);
   }, [banner]);
 
@@ -26,6 +27,18 @@ export function Banners() {
       {banner && (
         <div className={`banner ${banner.kind}`}>
           <span className="flex-1">{banner.text}</span>
+          {banner.action && (
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                const run = banner.action?.run;
+                useStore.getState().setBanner(null);
+                run?.();
+              }}
+            >
+              {banner.action.label}
+            </button>
+          )}
           <button className="btn btn-ghost btn-sm" aria-label="Dismiss" onClick={() => useStore.getState().setBanner(null)}>✕</button>
         </div>
       )}

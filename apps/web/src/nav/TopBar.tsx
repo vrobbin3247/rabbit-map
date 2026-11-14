@@ -65,7 +65,7 @@ export function TopBar() {
           Export
         </button>
       </div>
-      <div className="flex items-center gap-2 border-t border-[var(--border)] px-3 py-1.5">
+      <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border)] px-3 py-1.5">
         <button className="btn btn-sm" aria-label="Back" title="Back (Alt+←)" disabled={map.view.trail.length < 2} onClick={() => st().back()}>←</button>
         <button className="btn btn-sm" aria-label="Forward" title="Forward (Alt+→)" disabled={forwardCount === 0} onClick={() => st().forwardNav()}>→</button>
         <div className="min-w-0 flex-1"><Breadcrumb /></div>

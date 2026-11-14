@@ -26,6 +26,18 @@ const GRAY = '#94a3b8';
 const ACCENT = '#6366f1';
 const MINIMAP_KEY = 'mindmapper.minimap';
 
+/**
+ * The tool strip floats over the left edge of the board (it ends near 68 px). Fitting and centring
+ * treat that strip as unavailable, so a node is never placed underneath it. The trail is not
+ * floating: it is a column beside the board, so the board never extends under it.
+ */
+export const LEFT_INSET = 84;
+export const fitOptions = (duration = 250) => ({
+  padding: { left: `${LEFT_INSET}px`, top: '32px', right: '32px', bottom: '88px' } as const,
+  maxZoom: 1,
+  duration,
+});
+
 function readMinimap(): boolean {
   try {
     // Off by default: it would otherwise sit on top of nodes near the corner.
@@ -90,7 +102,7 @@ function ContextMenuHost({ anyPinned }: { anyPinned: boolean }) {
   } else {
     label = 'Board actions';
     entries = [
-      { id: 'fit', label: 'Fit the whole map', run: () => void rf.fitView({ padding: 0.2, maxZoom: 1, duration: 250 }) },
+      { id: 'fit', label: 'Fit the whole map', run: () => void rf.fitView(fitOptions()) },
       { id: 'anchor', label: 'Go to anchor', hint: 'A', disabled: map.view.selectedId === map.view.anchorId, run: () => st().goToAnchor() },
       'separator',
       { id: 'tidy', label: 'Tidy up layout', disabled: !anyPinned, run: () => void st().tidyUp() },
@@ -108,6 +120,7 @@ function Canvas() {
   const flow = useStoreApi();
   const { resolved: theme } = useTheme();
   const timer = useRef<number | undefined>(undefined);
+  const heading = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const selectedId = map.view.selectedId;
   const [minimap, setMinimap] = useState(readMinimap);
   // Positions of nodes being dragged right now; committed to the map when the drag ends.
@@ -175,17 +188,33 @@ function Canvas() {
     return { nodes, edges };
   }, [map, index, auto, positions, selectedId, showAll]);
 
+  /** Put a node in the middle of the free area, not the middle of the whole board. */
+  const centreOn = (pos: { x: number; y: number }, zoom: number, duration: number) => {
+    const { width, height } = flow.getState();
+    const cx = LEFT_INSET + (width - LEFT_INSET) / 2;
+    const vp = { x: cx - (pos.x + NODE_W / 2) * zoom, y: (height - 56) / 2 - (pos.y + NODE_H / 2) * zoom, zoom };
+    // Remember where the viewport is heading. A second selection that arrives mid-animation must be
+    // judged against this, not against the half-way position, or it can wrongly skip centring.
+    heading.current = vp;
+    window.setTimeout(() => {
+      if (heading.current === vp) heading.current = null;
+    }, duration + 80);
+    void rf.setViewport(vp, { duration });
+  };
+
   // Centre on the selection only when it is off-screen.
   useEffect(() => {
     if (!selectedId) return;
     const pos = positions.get(selectedId);
     if (!pos) return;
     const { width, height, transform } = flow.getState();
-    const [tx, ty, zoom] = transform;
+    const h = heading.current;
+    const [tx, ty, zoom] = h ? [h.x, h.y, h.zoom] : transform;
     const x = pos.x * zoom + tx;
     const y = pos.y * zoom + ty;
-    const inside = x >= 0 && y >= 0 && x + NODE_W * zoom <= width && y + NODE_H * zoom <= height;
-    if (!inside) void rf.setCenter(pos.x + NODE_W / 2, pos.y + NODE_H / 2, { zoom: Math.max(zoom, 0.6), duration: 250 });
+    // "On screen" means in the free area: right of the floating tools, clear of the zoom pill.
+    const inside = x >= LEFT_INSET && y >= 8 && x + NODE_W * zoom <= width - 8 && y + NODE_H * zoom <= height - 72;
+    if (!inside) centreOn(pos, Math.max(zoom, 0.6), 250);
     // Runs when the selection changes, not on every drag.
   }, [selectedId]);
 
@@ -203,7 +232,7 @@ function Canvas() {
 
   const centreOnSelection = () => {
     const pos = selectedId ? positions.get(selectedId) : null;
-    if (pos) void rf.setCenter(pos.x + NODE_W / 2, pos.y + NODE_H / 2, { zoom: rf.getZoom(), duration: 250 });
+    if (pos) centreOn(pos, rf.getZoom(), 250);
   };
 
   return (
@@ -224,7 +253,7 @@ function Canvas() {
       maxZoom={2}
       defaultViewport={map.view.viewport ?? undefined}
       fitView={!map.view.viewport}
-      fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+      fitViewOptions={fitOptions(0)}
       onNodeClick={(_, n) => useStore.getState().select(n.id)}
       onNodeDoubleClick={(_, n) => {
         const node = map.nodes[n.id];
@@ -251,7 +280,7 @@ function Canvas() {
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.6} />
 
       <Panel position="top-left" className="toolbar" aria-label="Board tools">
-        <ToolButton label="Fit the whole map" onClick={() => void rf.fitView({ padding: 0.2, maxZoom: 1, duration: 250 })}>
+        <ToolButton label="Fit the whole map" onClick={() => void rf.fitView(fitOptions())}>
           <path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4" />
         </ToolButton>
         <ToolButton label="Centre on the selected node" onClick={centreOnSelection} disabled={!selectedId}>

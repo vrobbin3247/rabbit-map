@@ -180,6 +180,62 @@ describe('moving nodes', () => {
   });
 });
 
+describe('undo', () => {
+  const deleted = (id: string, label: string) =>
+    jsonResponse({ removedIds: [id], nodes: [], view: { selectedId: 'r', anchorId: 'r', trail: ['r'], viewport: null }, undo: { id: 'U1', label } });
+
+  it('a delete offers Undo, with a button on the message', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => deleted('t', 'Deleted “Transformer”')));
+    await st().deleteNode('t');
+    expect(st().undo).toEqual({ id: 'U1', label: 'Deleted “Transformer”' });
+    expect(st().banner).toMatchObject({ kind: 'info', text: 'Deleted “Transformer”', action: { label: 'Undo' } });
+    expect(st().map!.nodes.t).toBeUndefined();
+  });
+
+  it('Undo puts the map back from the server, clears the offer, and says so', async () => {
+    const full = sampleMap();
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => (String(url).endsWith('/undo') ? jsonResponse({ map: full, label: 'Deleted “Transformer”' }) : deleted('t', 'Deleted “Transformer”'))));
+    await st().deleteNode('t');
+    st().banner!.action!.run();
+    await vi.waitFor(() => expect(st().undo).toBeNull());
+    expect(st().map!.nodes.t?.title).toBe('Transformer');
+    expect(st().index!.children.get('r')).toContain('t'); // the board's index was rebuilt
+    expect(st().banner?.text).toBe('Undone: Deleted “Transformer”.');
+  });
+
+  it('sends the id it was given, once', async () => {
+    const f = vi.fn(async (url: string) => (String(url).endsWith('/undo') ? jsonResponse({ map: sampleMap(), label: 'x' }) : deleted('t', 'x')));
+    vi.stubGlobal('fetch', f);
+    await st().deleteNode('t');
+    await st().undoLast();
+    await st().undoLast(); // nothing left to undo: no second request
+    const calls = f.mock.calls.filter((c) => String(c[0]).endsWith('/undo')) as unknown as [string, RequestInit][];
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(calls[0]![1].body as string)).toEqual({ undoId: 'U1' });
+  });
+
+  it('a refused undo shows the reason and can be retried; an expired one is forgotten', async () => {
+    let code = 'conflict';
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => (String(url).endsWith('/undo') ? jsonResponse({ error: { code, message: 'It changed after that.' } }, code === 'conflict' ? 409 : 404) : deleted('t', 'x'))));
+    await st().deleteNode('t');
+    await st().undoLast();
+    expect(st().banner).toMatchObject({ kind: 'error', text: 'It changed after that.' });
+    expect(st().undo).not.toBeNull(); // still offered
+    code = 'not_found';
+    await st().undoLast();
+    expect(st().undo).toBeNull();
+  });
+
+  it('a merge offers Undo too, and opening another map forgets it', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ removedIds: ['ch'], nodes: [], view: { selectedId: 'r', anchorId: 'r', trail: ['r'], viewport: null }, undo: { id: 'U2', label: 'Merged “Channel” into “Transformer”' } })));
+    await st().mergeNode('ch', 't');
+    expect(st().undo?.id).toBe('U2');
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ map: { ...sampleMap(), id: 'OTHER' }, maps: [], unreadable: [], providers: [] })));
+    await st().openMap('OTHER');
+    expect(st().undo).toBeNull();
+  });
+});
+
 describe('structure changes', () => {
   it('delete applies removed ids and cleans the forward stack', async () => {
     st().select('c');

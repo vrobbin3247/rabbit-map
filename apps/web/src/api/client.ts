@@ -47,6 +47,8 @@ export interface Changes {
   removedIds: string[];
   nodes: ConceptNode[];
   view: ViewState;
+  /** Present for delete and merge: how to reverse it. */
+  undo?: { id: string; label: string };
 }
 
 export const api = {
@@ -61,6 +63,7 @@ export const api = {
   exportMap: (id: string) => req<{ path: string; files: number }>('POST', `/maps/${id}/export`, {}),
   patchPositions: (id: string, b: { positions?: Record<string, { x: number; y: number } | null>; reset?: boolean }) =>
     req<{ nodes: ConceptNode[] }>('PATCH', `/maps/${id}/positions`, b),
+  undo: (id: string, undoId: string) => req<{ map: MapFile; label: string }>('POST', `/maps/${id}/undo`, { undoId }),
   openConcept: (id: string, b: { fromNodeId: string; term: string; snippet?: string }) =>
     req<{ node: ConceptNode; created: boolean }>('POST', `/maps/${id}/nodes`, b),
   patchNode: (id: string, nodeId: string, b: { title?: string; collapsed?: boolean }) =>

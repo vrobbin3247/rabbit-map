@@ -8,8 +8,10 @@ import {
   PatchNodeBodySchema,
   PatchPositionsBodySchema,
   PatchViewBodySchema,
+  UndoBodySchema,
   type ConceptNode,
   type ProviderId,
+  subtreeOf,
 } from '@mindmapper/shared';
 import type { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
@@ -28,6 +30,7 @@ import {
   setPositions,
 } from '../store/mutations';
 import { ULID_RE } from '../ids';
+import { UndoLog, applyUndo, runWithUndo } from '../store/undo';
 import { parseBody, type Deps } from './app';
 
 const id = (v: string, what = 'id') => {
@@ -38,6 +41,7 @@ const id = (v: string, what = 'id') => {
 export function registerRoutes(app: Hono, deps: Deps): void {
   const { store, registry, jobs, config } = deps;
   const gen = { store, registry, jobs };
+  const undoLog = new UndoLog();
 
   // ---------- health ----------
   app.get('/api/health', async (c) => c.json(await registry.health(c.req.query('refresh') === '1')));
@@ -101,6 +105,7 @@ export function registerRoutes(app: Hono, deps: Deps): void {
     // Stop anything still being written for this map, and let it finish restoring its node, so it
     // cannot spend plan quota for a map that is going away or write the file back afterwards.
     await jobs.abortAndWait(`${mapId}:`);
+    undoLog.forget(mapId);
     await store.delete(mapId);
     return c.body(null, 204);
   });
@@ -156,12 +161,18 @@ export function registerRoutes(app: Hono, deps: Deps): void {
     const map = await store.get(mapId);
     if (!map.nodes[nodeId]) throw new AppError('not_found', 'Node not found.');
     if (jobs.hasAny(subtreeKeys(mapId, map, nodeId))) throw new AppError('conflict', 'Wait for the running generation to finish, or stop it first.');
-    const r = await store.mutate(mapId, (m) => deleteNode(m, nodeId));
+    const title = map.nodes[nodeId]?.title ?? 'node';
+    const { result: r, entry } = await store.mutate(mapId, (m) => {
+      const size = subtreeOf(m, nodeId).length;
+      return runWithUndo(m, size > 1 ? `Deleted “${title}” and ${size - 1} below it` : `Deleted “${title}”`, () => deleteNode(m, nodeId));
+    });
+    undoLog.add(mapId, entry);
     const after = await store.get(mapId);
     return c.json({
       removedIds: r.removedIds,
       nodes: r.changedIds.map((i) => after.nodes[i]).filter(Boolean),
       view: after.view,
+      undo: { id: entry.id, label: entry.label },
     });
   });
 
@@ -172,13 +183,34 @@ export function registerRoutes(app: Hono, deps: Deps): void {
     if (jobs.hasAny([jobKey(mapId, nodeId), jobKey(mapId, body.intoId)])) {
       throw new AppError('conflict', 'Wait for the running generation to finish, or stop it first.');
     }
-    const r = await store.mutate(mapId, (m) => mergeNodes(m, nodeId, body.intoId));
+    const { result: r, entry } = await store.mutate(mapId, (m) => {
+      const from = m.nodes[nodeId]?.title ?? 'node';
+      const into = m.nodes[body.intoId]?.title ?? 'node';
+      return runWithUndo(m, `Merged “${from}” into “${into}”`, () => mergeNodes(m, nodeId, body.intoId));
+    });
+    undoLog.add(mapId, entry);
     const after = await store.get(mapId);
     return c.json({
       removedIds: r.removedIds,
       nodes: r.changedIds.map((i) => after.nodes[i]).filter(Boolean),
       view: after.view,
+      undo: { id: entry.id, label: entry.label },
     });
+  });
+
+  app.post('/api/maps/:mapId/undo', async (c) => {
+    const mapId = id(c.req.param('mapId'));
+    const body = await parseBody(c, UndoBodySchema);
+    await store.get(mapId);
+    const entry = undoLog.take(mapId, body.undoId);
+    if (!entry) throw new AppError('not_found', 'Nothing to undo. It may have already been undone, or the server was restarted.');
+    try {
+      await store.mutate(mapId, (m) => applyUndo(m, entry));
+    } catch (e) {
+      undoLog.restore(mapId, entry); // a refused undo stays available, for example until a clash is resolved
+      throw e;
+    }
+    return c.json({ map: await store.get(mapId), label: entry.label });
   });
 
   app.delete('/api/maps/:mapId/nodes/:nodeId/thread/:messageId', async (c) => {
