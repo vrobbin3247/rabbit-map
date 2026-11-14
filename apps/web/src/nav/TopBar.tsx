@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../api/client';
 import { useStore } from '../state/store';
 import { PromptDialog } from '../ui/Dialog';
+import { ThemeToggle } from '../ui/ThemeToggle';
 import { Breadcrumb } from './Breadcrumb';
 
 export function TopBar() {
@@ -47,6 +48,7 @@ export function TopBar() {
           <option value="intermediate">intermediate</option>
           <option value="advanced">advanced</option>
         </select>
+        <ThemeToggle />
         <button className="btn btn-sm" onClick={() => st().set({ searchOpen: true })}>Search <span className="kbd">⌘K</span></button>
         <button
           className="btn btn-sm"

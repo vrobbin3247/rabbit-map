@@ -139,6 +139,9 @@ Precise definitions are in [DATA-MODEL.md](DATA-MODEL.md).
 - **FR-9.2** Nodes the learner has not placed follow their parent when it moves.
 - **FR-9.3** **Tidy up** returns every node to automatic layout.
 - **FR-9.4** The board shows a dotted background, sticky-note nodes coloured by depth, and floating tools, zoom and trail.
+- **FR-9.5** Right-clicking a node (or Shift+F10) opens a menu of the actions that apply to it; right-clicking empty space opens board actions. See UX.md.
+- **FR-9.6** A learner can add a child concept to any node by name, without a model call.
+- **FR-9.7** The theme can be set to Light, Dark or System, and is remembered.
 
 ## 8. Non-functional requirements
 

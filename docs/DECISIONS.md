@@ -166,6 +166,30 @@ Entries D-01 to D-15 were made on 2026-11-14 during research and specification, 
 
 ---
 
+### D-22. One action list for both node menus
+
+**Decision**: `nodeMenu()` builds the items for a node, and both the panel's `⋯` menu and the right-click menu render it. The dialogs they open (rename, merge, delete, add child) live in one `NodeDialogs` host driven by store state.
+
+**Why**: two menus written separately would drift apart, and the dialogs would have to be copied or hoisted anyway.
+
+**Rejected**: a separate right-click menu with its own list; opening dialogs from component-local state.
+
+### D-23. Escape closes a menu before it stops a generation
+
+**Decision**: the context menu handles Escape in the capture phase and stops it from propagating.
+
+**Why**: Escape already stops the running generation for the selected node. Closing a menu must not also cancel work the learner did not mean to cancel. There is a browser test for this.
+
+### D-24. Theme is an attribute on the page, with System as "no attribute"
+
+**Decision**: Light and Dark set `data-theme` on `<html>`. System removes it, and the stylesheet's `prefers-color-scheme` rule applies. A small inline script applies a stored choice before first paint.
+
+**Why**: it needs no JavaScript to follow the OS, avoids a flash of the wrong theme, and keeps one set of colour variables per theme.
+
+**Cost**: the dark values appear twice in the stylesheet (once for the explicit choice, once for System under a dark OS), because CSS cannot share a rule between an attribute selector and a media query.
+
+---
+
 ## Choices that are cheap to change
 
 These were made to keep the build moving. Changing them touches little code.

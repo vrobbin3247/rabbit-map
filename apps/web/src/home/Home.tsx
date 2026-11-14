@@ -3,6 +3,7 @@ import type { ProviderStatus } from '@mindmapper/shared';
 import { useStore } from '../state/store';
 import { Banners } from '../ui/Banners';
 import { ConfirmDialog, PromptDialog } from '../ui/Dialog';
+import { ThemeToggle } from '../ui/ThemeToggle';
 
 const NAMES: Record<string, string> = { claude: 'Claude', codex: 'ChatGPT (Codex)', fake: 'Fake (testing)' };
 
@@ -61,9 +62,12 @@ export function Home() {
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col gap-6 overflow-y-auto px-4 py-10">
       <Banners />
-      <header>
-        <h1 className="m-0 text-2xl font-bold">Mindmapper</h1>
-        <p className="m-0 muted">Learn a topic without losing the thread.</p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="m-0 text-2xl font-bold">Mindmapper</h1>
+          <p className="m-0 muted">Learn a topic without losing the thread.</p>
+        </div>
+        <ThemeToggle />
       </header>
 
       <ProviderChips />

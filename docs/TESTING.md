@@ -11,7 +11,7 @@
 | Unit | Vitest | `packages/shared`, provider event handling, context building, `apply`, job queue | `npm test` |
 | Integration | Vitest, Hono `app.request` | The HTTP API end to end with the fake provider and a temporary data directory | `npm test` |
 | Component | Vitest, Testing Library | Markdown and link rendering, store reducers, stream reader | `npm test` |
-| End to end | Playwright (`e2e/walkthrough.spec.ts`) | The PRD walkthrough, Stop, provider errors, text selection and keyboard, origin guard, in a real browser against the fake provider. Any uncaught page exception fails the test | `npm run test:e2e` |
+| End to end | Playwright (`e2e/walkthrough.spec.ts`) | The PRD walkthrough, dragging, right-click menus, the theme toggle, Stop, provider errors, text selection and keyboard, origin guard, in a real browser against the fake provider. Any uncaught page exception fails the test | `npm run test:e2e` |
 | Smoke | `scripts/smoke.ts` | One real call per provider | By hand |
 | Real-provider browser test | `e2e/real.manual.ts` | The same app against real Claude: root, child, shared links, a question | `npm run test:real`, by hand (3 model calls) |
 | Manual | Checklist below | The product with real providers | Before calling a milestone done |

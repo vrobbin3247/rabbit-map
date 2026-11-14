@@ -159,6 +159,142 @@ test('drag a node: it moves, stays put after reload, its unplaced branch follows
   await page.screenshot({ path: 'test-results/fake-board.png' });
 });
 
+const menu = (page: Page) => page.getByRole('menu', { name: /^Actions for/ });
+const item = (page: Page, name: string | RegExp) => page.getByRole('menuitem', { name });
+
+test('right-click menu on a node: select, add a child, navigate, release a dragged node, Escape', async ({ page, request }) => {
+  await create(page, 'Menus');
+  await written(page);
+  const a = node(page, 'Menus Part A');
+
+  // right-click selects the node and opens its menu
+  await a.click({ button: 'right' });
+  await expect(menu(page)).toBeVisible();
+  await expect(panel(page).getByRole('heading', { name: 'Menus Part A' })).toBeVisible();
+  await expect(item(page, 'Explain')).toBeVisible();
+  await expect(item(page, /^Regenerate/)).toHaveCount(0);
+  await expect(item(page, /^Delete/)).toBeVisible();
+  await expect(item(page, 'Release position')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(menu(page)).toHaveCount(0);
+
+  // Add child concept: a stub, not explained, no model call
+  await a.click({ button: 'right' });
+  await item(page, /^Add child concept/).click();
+  await page.getByRole('dialog').getByRole('textbox').fill('Custom Idea');
+  await page.keyboard.press('Enter');
+  await expect(panel(page).getByRole('heading', { name: 'Custom Idea' })).toBeVisible();
+  await expect(panel(page).getByRole('button', { name: 'Explain' })).toBeVisible();
+  await expect(node(page, 'Custom Idea')).toBeVisible();
+
+  // an existing name opens the existing node instead of duplicating it
+  await a.click({ button: 'right' });
+  await item(page, /^Add child concept/).click();
+  await page.getByRole('dialog').getByRole('textbox').fill('menus part b');
+  await page.keyboard.press('Enter');
+  await expect(panel(page).getByRole('heading', { name: 'Menus Part B' })).toBeVisible();
+  await expect(page.getByText(/already exists/)).toBeVisible();
+
+  // navigation items
+  await node(page, 'Custom Idea').click({ button: 'right' });
+  await item(page, 'Go to parent').click();
+  await expect(panel(page).getByRole('heading', { name: 'Menus Part A' })).toBeVisible();
+
+  // drag a node, then release it from the menu
+  const box = (await a.boundingBox())!;
+  await page.mouse.move(box.x + 40, box.y + 30);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 120, box.y + 120, { steps: 6 });
+  await page.mouse.up();
+  await a.click({ button: 'right' });
+  await item(page, 'Release position').click();
+  const mapId = ((await (await request.get('/api/maps')).json()).maps as { id: string; title: string }[]).find((m) => m.title === 'Menus')!.id;
+  await expect.poll(async () => Object.values((await (await request.get(`/api/maps/${mapId}`)).json()).map.nodes as Record<string, { position?: unknown }>).filter((n) => n.position).length).toBe(0);
+
+  // empty board: board actions
+  const pane = page.locator('.react-flow__pane');
+  await pane.click({ button: 'right', position: { x: 300, y: 500 } });
+  await expect(page.getByRole('menu', { name: 'Board actions' })).toBeVisible();
+  await expect(item(page, 'Fit the whole map')).toBeVisible();
+  await expect(item(page, 'Tidy up layout')).toBeDisabled(); // nothing is pinned
+  await item(page, 'Show all cross-links').click();
+  await pane.click({ button: 'right', position: { x: 300, y: 500 } });
+  await expect(item(page, 'Hide cross-links')).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // keyboard: Shift+F10 opens the menu for the selected node; arrows move; Enter runs
+  await node(page, 'Menus Part B').click();
+  await page.locator('.react-flow').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('Shift+F10');
+  await expect(menu(page)).toBeVisible();
+  await expect(item(page, 'Explain')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(item(page, 'Ask a question…')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(menu(page)).toHaveCount(0);
+  await expect(panel(page).getByPlaceholder(/^Ask about/)).toBeFocused();
+});
+
+test('Escape closes the menu without stopping a running generation; Stop writing does', async ({ page }) => {
+  await create(page, 'Busy __hang__');
+  await expect(panel(page).getByRole('button', { name: /^Stop/ })).toBeVisible();
+  await node(page, 'Busy __hang__').click({ button: 'right' });
+  await expect(item(page, 'Stop writing')).toBeVisible();
+  await expect(item(page, /^Delete/)).toHaveCount(0); // the root has no Delete
+  await page.keyboard.press('Escape');
+  await expect(menu(page)).toHaveCount(0);
+  await expect(panel(page).getByRole('button', { name: /^Stop/ })).toBeVisible(); // still running
+  await node(page, 'Busy __hang__').click({ button: 'right' });
+  await item(page, 'Stop writing').click();
+  await expect(panel(page).getByRole('button', { name: 'Explain' })).toBeVisible();
+});
+
+test('theme toggle: light, dark, system; remembered; the board follows', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const attr = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  const toggle = (name: string) => page.getByRole('button', { name: `${name} theme` });
+
+  await expect(toggle('System')).toHaveAttribute('aria-pressed', 'true');
+  expect(await attr()).toBeNull();
+  const light = await bg();
+
+  await toggle('Dark').click();
+  expect(await attr()).toBe('dark');
+  const dark = await bg();
+  expect(dark).not.toBe(light);
+  await expect(toggle('Dark')).toHaveAttribute('aria-pressed', 'true');
+
+  // remembered across a reload, and applied before the first paint (no flash)
+  await page.reload();
+  expect(await attr()).toBe('dark');
+  expect(await bg()).toBe(dark);
+
+  // System follows the OS
+  await toggle('System').click();
+  expect(await attr()).toBeNull();
+  expect(await bg()).toBe(light);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  expect(await bg()).toBe(dark);
+
+  // an explicit Light wins over a dark OS
+  await toggle('Light').click();
+  expect(await attr()).toBe('light');
+  expect(await bg()).toBe(light);
+
+  // the board follows the theme too
+  await toggle('Dark').click();
+  await page.getByPlaceholder('e.g. Deep learning').fill('Theming');
+  await page.getByRole('button', { name: 'Start mapping' }).click();
+  await expect(page.locator('.react-flow')).toHaveClass(/dark/);
+  await page.getByRole('button', { name: 'Light theme' }).click();
+  await expect(page.locator('.react-flow')).toHaveClass(/light/);
+  await page.screenshot({ path: 'test-results/fake-light.png' });
+  await page.getByRole('button', { name: 'Dark theme' }).click();
+  await page.screenshot({ path: 'test-results/fake-dark.png' });
+});
+
 test('Stop returns a node to its previous state', async ({ page }) => {
   await create(page, 'Waiting __hang__');
   await expect(panel(page).getByRole('button', { name: /^Stop/ })).toBeVisible();

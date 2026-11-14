@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { subtreeOf, type ConceptNode } from '@mindmapper/shared';
+import type { ConceptNode } from '@mindmapper/shared';
 import { useStore } from '../state/store';
-import { ConfirmDialog, Dialog, PromptDialog } from '../ui/Dialog';
+import { nodeMenu } from '../nav/nodeActions';
+import { MenuList } from '../ui/MenuList';
 import { AskBox } from './AskBox';
 import { Markdown } from './Markdown';
 import { SelectionPopover } from './SelectionPopover';
@@ -31,109 +32,39 @@ function Skeleton({ since, phase, streams }: { since: number; phase: string | nu
   );
 }
 
-function MergeDialog({ node, onClose }: { node: ConceptNode; onClose: () => void }) {
-  const map = useStore((s) => s.map)!;
-  const [q, setQ] = useState('');
-  const banned = new Set(subtreeOf(map, node.id));
-  const list = Object.values(map.nodes)
-    .filter((n) => !banned.has(n.id) && n.title.toLowerCase().includes(q.toLowerCase()))
-    .slice(0, 40);
-  return (
-    <Dialog title={`Merge “${node.title}” into…`} onClose={onClose}>
-      <p className="m-0 text-xs muted">Its children and questions move to the node you pick. Links to its name keep working.</p>
-      <input className="field" autoFocus placeholder="Find a node" value={q} onChange={(e) => setQ(e.target.value)} />
-      <ul className="m-0 flex-1 list-none overflow-y-auto p-0">
-        {list.map((n) => (
-          <li key={n.id}>
-            <button
-              className="btn btn-ghost w-full justify-start"
-              onClick={async () => {
-                if (await useStore.getState().mergeNode(node.id, n.id)) onClose();
-              }}
-            >
-              {n.title}
-            </button>
-          </li>
-        ))}
-        {!list.length && <li className="muted">No matching node.</li>}
-      </ul>
-    </Dialog>
-  );
-}
-
 function NodeMenu({ node }: { node: ConceptNode }) {
   const map = useStore((s) => s.map)!;
-  const [open, setOpen] = useState(false);
-  const [dlg, setDlg] = useState<null | 'rename' | 'merge' | 'delete'>(null);
+  const index = useStore((s) => s.index)!;
   const busy = useStore((s) => Object.keys(s.streams).length > 0);
-  const st = useStore.getState;
-  const isRoot = node.id === map.rootId;
-  const size = subtreeOf(map, node.id).length;
-  const hasKids = size > 1;
+  const streaming = useStore((s) => !!s.streams[node.id]);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest('[data-node-menu]')) setOpen(false);
     };
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
     document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', esc);
+    window.addEventListener('keydown', esc, true);
     return () => {
       document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', esc);
+      window.removeEventListener('keydown', esc, true);
     };
   }, [open]);
-
-  const item = (label: string, fn: () => void, disabled = false) => (
-    <button
-      role="menuitem"
-      disabled={disabled}
-      onClick={() => {
-        setOpen(false);
-        fn();
-      }}
-    >
-      {label}
-    </button>
-  );
 
   return (
     <div className="relative" data-node-menu>
       <button className="btn btn-sm" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} aria-label="Node actions">⋯</button>
       {open && (
-        <div className="menu" role="menu">
-          {item('Set as anchor', () => st().setAnchor(node.id), map.view.anchorId === node.id)}
-          {item('Regenerate', () => void st().explain(node.id, true), busy || node.status === 'stub' || node.status === 'generating')}
-          {item('Rename…', () => setDlg('rename'))}
-          {item('Merge into…', () => setDlg('merge'), isRoot)}
-          {item(node.collapsed ? 'Expand subtree' : 'Collapse subtree', () => void st().toggleCollapse(node.id), !hasKids)}
-          {item('Delete…', () => setDlg('delete'), isRoot || busy)}
+        <div className="menu">
+          <MenuList entries={nodeMenu(map, index, node, { busy, streaming })} onDone={() => setOpen(false)} label="Node actions" />
         </div>
-      )}
-      {dlg === 'rename' && (
-        <PromptDialog
-          title="Rename node"
-          initial={node.title}
-          onClose={() => setDlg(null)}
-          onSubmit={async (v) => {
-            if (await st().renameNode(node.id, v)) setDlg(null);
-          }}
-        />
-      )}
-      {dlg === 'merge' && <MergeDialog node={node} onClose={() => setDlg(null)} />}
-      {dlg === 'delete' && (
-        <ConfirmDialog
-          title="Delete node"
-          danger
-          confirm={size > 1 ? `Delete ${size} nodes` : 'Delete'}
-          message={size > 1 ? `“${node.title}” and ${size - 1} node${size > 2 ? 's' : ''} below it will be deleted. Links to them become ghost links.` : `“${node.title}” will be deleted. Links to it become ghost links.`}
-          onClose={() => setDlg(null)}
-          onConfirm={() => {
-            setDlg(null);
-            void st().deleteNode(node.id);
-          }}
-        />
       )}
     </div>
   );

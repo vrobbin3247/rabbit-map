@@ -3,6 +3,7 @@ import { MapCanvas } from './canvas/MapCanvas';
 import { SearchPalette } from './nav/SearchPalette';
 import { TopBar } from './nav/TopBar';
 import { Trail } from './nav/Trail';
+import { NodeDialogs } from './panel/NodeDialogs';
 import { NodePanel } from './panel/NodePanel';
 import { useStore } from './state/store';
 import { Banners } from './ui/Banners';
@@ -45,6 +46,17 @@ export function MapView() {
         return st.set({ searchOpen: !st.searchOpen });
       }
       if (st.searchOpen || document.querySelector('[role="dialog"]')) return;
+      // The open-menu key works from the canvas, the page or the panel heading, like the arrow keys.
+      if ((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && onCanvasOrPage(e.target)) {
+        const id = map.view.selectedId;
+        if (id) {
+          e.preventDefault();
+          const r = document.querySelector(`.react-flow__node[data-id="${id}"]`)?.getBoundingClientRect();
+          st.set({ ctxMenu: { x: r ? r.left + r.width / 2 : window.innerWidth / 3, y: r ? r.top + r.height / 2 : window.innerHeight / 3, target: { kind: 'node', id } } });
+        }
+        return;
+      }
+      if (document.querySelector('[data-context-menu]')) return;
       if (e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault();
         return st.back();
@@ -126,6 +138,7 @@ export function MapView() {
         <div style={{ width }} className="min-h-0 shrink-0"><NodePanel /></div>
       </div>
       {searchOpen && <SearchPalette />}
+      <NodeDialogs />
     </div>
   );
 }

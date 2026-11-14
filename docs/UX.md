@@ -141,6 +141,32 @@ Selecting text inside an explanation or an answer shows a small popover:
 
 Selecting a stub does not explain it automatically. The learner presses **Explain** (or double-clicks), so a stray click never spends plan quota.
 
+### Context menus
+
+Right-click a node, or press **Shift+F10** or the menu key with a node selected, to open its menu. Right-clicking also selects the node, so the panel and the menu always agree. The panel's `⋯` menu shows the same list.
+
+| Item | Shown when |
+|---|---|
+| Explain (Enter) | the node is a stub |
+| Try again (Enter) | the node failed |
+| Regenerate | the node is explained |
+| Stop writing (Esc) | the node is being written |
+| Ask a question… (/) | always; selects the node and focuses the ask box |
+| Add child concept… | always; creates a stub under the node with no model call. A name that already exists opens that node instead, with a note |
+| Go to parent (←), Go to first child (→) | it has one |
+| Set as anchor | always; disabled on the anchor |
+| Release position | the node was dragged |
+| Collapse branch / Expand branch | it has children |
+| Copy link `[[Title]]` | always |
+| Copy explanation | the node has been explained |
+| Rename… | always |
+| Merge into… | not the root; disabled while anything is being written |
+| Delete… (red) | not the root; disabled while anything is being written |
+
+Right-click empty board space for board actions: **Fit the whole map**, **Go to anchor**, **Tidy up layout** (disabled when nothing has been moved), and **Show all cross-links** or **Hide cross-links**.
+
+Menus open under the pointer and stay on screen. Arrow keys, Home and End move; Enter runs; Escape closes the menu **only** and does not also stop a generation; Tab, an outside click, scrolling or resizing close it. Rename, Merge, Delete and Add child open the same dialogs from either menu.
+
 ## 5. Finding the way back
 
 This is the reason the product exists. All four tools are visible at all times on the Map screen.
@@ -176,7 +202,8 @@ This is the reason the product exists. All four tools are visible at all times o
 | `Alt+←` / `Alt+→` | Back / Forward |
 | `Enter` on a selected stub | Explain |
 | `/` | Focus the ask box |
-| `Esc` | Close popover or palette; stop a running generation in the panel |
+| `Esc` | Close an open menu, popover or palette first; otherwise stop a running generation in the panel |
+| `Shift+F10` or the menu key | Open the context menu of the selected node |
 | `A` | Go to anchor |
 | Arrow keys on the canvas | Move selection to parent (←), first child (→), previous or next sibling (↑ ↓) |
 
@@ -184,7 +211,7 @@ Shortcuts made of a single letter are disabled while a text field has focus.
 
 ## 9. Visual rules
 
-- Light and dark themes following the system setting.
+- **Theme toggle**: Light, System and Dark, as three icon buttons in the top bar and on the home screen. System follows the operating system and changes with it. The choice is remembered in this browser and applied before the first paint, so there is no flash of the wrong theme. The board, sticky notes, menus and the canvas controls all follow it.
 - One accent colour for selection, the current path and links. State is never shown by colour alone: stubs are dashed, errors carry an icon.
 - Node size is fixed (220 × 72) so the layout is stable; long titles truncate with the full title in a tooltip.
 - Explanation text is set at a comfortable reading width inside the panel; the panel scrolls, the ask box does not.

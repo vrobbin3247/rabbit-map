@@ -17,6 +17,7 @@
   --danger: #b42318;
   --danger-soft: #fdeceb;
   --board: #f4f5f7;
+  --badge-bg: rgba(255, 255, 255, 0.65);
   --dots: #c9ccd4;
   --shadow: 0 1px 2px rgba(20, 24, 40, 0.08), 0 6px 18px rgba(20, 24, 40, 0.08);
   --tone-0: #fff4b8; --tone-0-line: #ecd45f;
@@ -27,8 +28,35 @@
   --tone-5: #e8dfff; --tone-5-line: #b19df0;
   color-scheme: light;
 }
+/* Dark values apply when the learner picks Dark, or when they pick System (no attribute) and the OS is dark. */
+:root[data-theme='dark'] {
+  --bg: #111113;
+  --panel: #1a1a1e;
+  --sunken: #222227;
+  --text: #ececf1;
+  --muted: #9b9ba6;
+  --border: #34343c;
+  --accent: #9a9bff;
+  --accent-soft: #27284a;
+  --accent-text: #101018;
+  --warn: #f0b252;
+  --warn-soft: #3a2c10;
+  --danger: #ff8a80;
+  --danger-soft: #3d1b19;
+  --board: #15161a;
+  --badge-bg: rgba(0, 0, 0, 0.35);
+  --dots: #33353d;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35);
+  --tone-0: #4b4421; --tone-0-line: #a38f2f;
+  --tone-1: #1f3a54; --tone-1-line: #3f7fb8;
+  --tone-2: #20442f; --tone-2-line: #3f9159;
+  --tone-3: #512a3b; --tone-3-line: #b8587f;
+  --tone-4: #4e361a; --tone-4-line: #b87b3a;
+  --tone-5: #372b5c; --tone-5-line: #7a64c4;
+  color-scheme: dark;
+}
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']):not([data-theme='dark']) {
     --bg: #111113;
     --panel: #1a1a1e;
     --sunken: #222227;
@@ -43,6 +71,7 @@
     --danger: #ff8a80;
     --danger-soft: #3d1b19;
     --board: #15161a;
+    --badge-bg: rgba(0, 0, 0, 0.35);
     --dots: #33353d;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35);
     --tone-0: #4b4421; --tone-0-line: #a38f2f;
@@ -122,8 +151,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: ui-san
 .cnode.on-path { border-color: var(--accent); }
 .cnode.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent), var(--shadow); }
 .cnode .badge { position: absolute; top: 4px; right: 6px; font-size: 10px; display: flex; gap: 4px; color: var(--muted); }
-.cnode .badge span { background: rgba(255, 255, 255, 0.65); border-radius: 999px; padding: 0 6px; }
-@media (prefers-color-scheme: dark) { .cnode .badge span { background: rgba(0, 0, 0, 0.35); } }
+.cnode .badge span { background: var(--badge-bg); border-radius: 999px; padding: 0 6px; }
 .cnode .badge .anchor { background: var(--accent-soft); color: var(--accent); }
 .hdl { opacity: 0 !important; pointer-events: none; }
 @keyframes pulse { 50% { opacity: 0.65; } }
@@ -139,6 +167,10 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: ui-san
 .pill .tool { border-radius: 999px; }
 .zoom-value { min-width: 52px; border: 0; background: none; border-radius: 999px; cursor: pointer; font-size: 12px; height: 34px; }
 .zoom-value:hover { background: var(--sunken); }
+.seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); }
+.seg-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 24px; border: 0; border-radius: 999px; background: none; color: var(--muted); cursor: pointer; }
+.seg-btn:hover { color: var(--text); }
+.seg-btn.on { background: var(--accent-soft); color: var(--accent); }
 .sep { height: 1px; margin: 3px 4px; background: var(--border); }
 .skeleton { background: linear-gradient(90deg, var(--sunken), var(--border), var(--sunken)); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; border-radius: 6px; height: 12px; }
 @keyframes shimmer { to { background-position: -200% 0; } }
@@ -146,8 +178,12 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: ui-san
 .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 50; }
 .dialog { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; width: min(520px, 92vw); max-height: 70vh; display: flex; flex-direction: column; gap: 10px; }
 .menu { position: absolute; right: 0; top: 100%; z-index: 20; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px; min-width: 190px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); }
-.menu button { display: block; width: 100%; text-align: left; padding: 6px 10px; border: 0; background: none; border-radius: 6px; cursor: pointer; }
+.menu button { display: flex; justify-content: space-between; gap: 16px; align-items: center; width: 100%; text-align: left; padding: 6px 10px; border: 0; background: none; border-radius: 6px; cursor: pointer; }
 .menu button:hover:not(:disabled) { background: var(--sunken); }
+.menu button.danger { color: var(--danger); }
+.menu .hint { color: var(--muted); font-size: 11px; }
+.menu-sep { height: 1px; margin: 4px 6px; background: var(--border); }
+.menu.ctx { position: fixed; right: auto; top: auto; z-index: 60; min-width: 210px; }
 .menu button:disabled { opacity: 0.45; cursor: not-allowed; }
 .popover { position: fixed; z-index: 40; display: flex; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2); }
 }

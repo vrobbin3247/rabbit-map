@@ -31,6 +31,13 @@ export interface Banner {
   sticky?: boolean;
 }
 
+export type NodeDialog = { kind: 'rename' | 'merge' | 'delete' | 'addChild'; id: string };
+export interface CtxMenu {
+  x: number;
+  y: number;
+  target: { kind: 'node'; id: string } | { kind: 'pane' };
+}
+
 interface Store {
   health: HealthResponse | null;
   maps: MapSummary[];
@@ -45,6 +52,8 @@ interface Store {
   searchOpen: boolean;
   askQuote: string | null;
   askFocusTick: number;
+  ctxMenu: CtxMenu | null;
+  nodeDialog: NodeDialog | null;
 
   init(): Promise<void>;
   loadHealth(refresh?: boolean): Promise<void>;
@@ -67,17 +76,20 @@ interface Store {
   ask(id: string, question: string): Promise<void>;
   retryAsk(id: string, messageId: string): Promise<void>;
   stop(id: string): void;
-  openConcept(fromId: string, term: string, snippet?: string): Promise<void>;
+  /** Open a concept under `fromId`. `autoExplain: false` only creates the stub ("Add child concept"). */
+  openConcept(fromId: string, term: string, snippet?: string, autoExplain?: boolean): Promise<void>;
   renameNode(id: string, title: string): Promise<boolean>;
   deleteNode(id: string): Promise<void>;
   mergeNode(id: string, intoId: string): Promise<boolean>;
   toggleCollapse(id: string): Promise<void>;
-  moveNodes(positions: Record<string, { x: number; y: number }>): Promise<void>;
+  /** Pin nodes at positions, or release them with null. */
+  moveNodes(positions: Record<string, { x: number; y: number } | null>): Promise<void>;
+  unpinNode(id: string): Promise<void>;
   tidyUp(): Promise<void>;
   deleteMessage(nodeId: string, messageId: string): Promise<void>;
 
   setBanner(b: Banner | null): void;
-  set(p: Partial<Pick<Store, 'showAllCrossLinks' | 'trailOpen' | 'searchOpen' | 'askQuote'>>): void;
+  set(p: Partial<Pick<Store, 'showAllCrossLinks' | 'trailOpen' | 'searchOpen' | 'askQuote' | 'ctxMenu' | 'nodeDialog'>>): void;
   focusAsk(): void;
 }
 
@@ -203,6 +215,8 @@ export const useStore = create<Store>()((set, get) => {
     searchOpen: false,
     askQuote: null,
     askFocusTick: 0,
+    ctxMenu: null,
+    nodeDialog: null,
 
     async init() {
       await Promise.all([get().loadHealth(), get().loadMaps()]);
@@ -334,16 +348,22 @@ export const useStore = create<Store>()((set, get) => {
     stop(id) {
       aborters.get(id)?.abort();
     },
-    async openConcept(fromId, term, snippet) {
+    async openConcept(fromId, term, snippet, autoExplain = true) {
       const m = get().map;
       if (!m) return;
       try {
         const existing = get().index ? resolve(get().index as MapIndex, term) : undefined;
-        if (existing) return get().select(existing);
+        if (existing) {
+          if (!autoExplain) {
+            const title = get().map?.nodes[existing]?.title ?? term;
+            set({ banner: { kind: 'info', text: `“${title}” already exists, so it was opened instead.` } });
+          }
+          return get().select(existing);
+        }
         const r = await api.openConcept(m.id, { fromNodeId: fromId, term, snippet: snippet?.slice(0, LIMITS.snippetMax) });
         applyNodes([r.node]);
         get().select(r.node.id);
-        if (r.created) void get().explain(r.node.id);
+        if (r.created && autoExplain) void get().explain(r.node.id);
       } catch (e) {
         fail(e);
       }
@@ -405,6 +425,9 @@ export const useStore = create<Store>()((set, get) => {
         fail(e);
         await refreshMap();
       }
+    },
+    async unpinNode(id) {
+      await get().moveNodes({ [id]: null });
     },
     async tidyUp() {
       const m = get().map;

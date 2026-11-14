@@ -14,7 +14,10 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import { pathOf, type ConceptNode } from '@mindmapper/shared';
+import { nodeMenu, type MenuEntry } from '../nav/nodeActions';
 import { useStore } from '../state/store';
+import { useTheme } from '../theme';
+import { ContextMenu } from '../ui/ContextMenu';
 import { ConceptNodeView, TONES, TONE_HEX, type ConceptFlowNode } from './ConceptNodeView';
 import { NODE_H, NODE_W, computeAuto, placeNodes } from './layout';
 
@@ -64,12 +67,46 @@ function ZoomPill() {
   );
 }
 
+/** The right-click menu: the node's actions, or board actions for empty space. */
+function ContextMenuHost({ anyPinned }: { anyPinned: boolean }) {
+  const menu = useStore((s) => s.ctxMenu);
+  const map = useStore((s) => s.map);
+  const index = useStore((s) => s.index);
+  const showAll = useStore((s) => s.showAllCrossLinks);
+  const busy = useStore((s) => Object.keys(s.streams).length > 0);
+  const streams = useStore((s) => s.streams);
+  const rf = useReactFlow();
+  if (!menu || !map || !index) return null;
+  const close = () => useStore.getState().set({ ctxMenu: null });
+  const st = useStore.getState;
+
+  let entries: MenuEntry[];
+  let label: string;
+  if (menu.target.kind === 'node') {
+    const node = map.nodes[menu.target.id];
+    if (!node) return null;
+    entries = nodeMenu(map, index, node, { busy, streaming: !!streams[node.id] });
+    label = `Actions for ${node.title}`;
+  } else {
+    label = 'Board actions';
+    entries = [
+      { id: 'fit', label: 'Fit the whole map', run: () => void rf.fitView({ padding: 0.2, maxZoom: 1, duration: 250 }) },
+      { id: 'anchor', label: 'Go to anchor', hint: 'A', disabled: map.view.selectedId === map.view.anchorId, run: () => st().goToAnchor() },
+      'separator',
+      { id: 'tidy', label: 'Tidy up layout', disabled: !anyPinned, run: () => void st().tidyUp() },
+      { id: 'cross', label: showAll ? 'Hide cross-links' : 'Show all cross-links', run: () => st().set({ showAllCrossLinks: !showAll }) },
+    ];
+  }
+  return <ContextMenu x={menu.x} y={menu.y} entries={entries} label={label} onClose={close} />;
+}
+
 function Canvas() {
   const map = useStore((s) => s.map)!;
   const index = useStore((s) => s.index)!;
   const showAll = useStore((s) => s.showAllCrossLinks);
   const rf = useReactFlow();
   const flow = useStoreApi();
+  const { resolved: theme } = useTheme();
   const timer = useRef<number | undefined>(undefined);
   const selectedId = map.view.selectedId;
   const [minimap, setMinimap] = useState(readMinimap);
@@ -174,7 +211,7 @@ function Canvas() {
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
-      colorMode="system"
+      colorMode={theme}
       onNodesChange={onNodesChange}
       nodesDraggable
       nodeDragThreshold={4}
@@ -196,6 +233,16 @@ function Canvas() {
       onNodeDragStop={(_, n) => {
         void useStore.getState().moveNodes({ [n.id]: { x: Math.round(n.position.x), y: Math.round(n.position.y) } });
         setLive({});
+      }}
+      onNodeContextMenu={(e, n) => {
+        e.preventDefault();
+        const st = useStore.getState();
+        st.select(n.id); // the panel and the menu always agree on which node this is
+        st.set({ ctxMenu: { x: e.clientX, y: e.clientY, target: { kind: 'node', id: n.id } } });
+      }}
+      onPaneContextMenu={(e) => {
+        e.preventDefault();
+        useStore.getState().set({ ctxMenu: { x: e.clientX, y: e.clientY, target: { kind: 'pane' } } });
       }}
       onPaneClick={() => (document.activeElement as HTMLElement | null)?.blur?.()}
       onMoveEnd={onMoveEnd}
@@ -234,6 +281,7 @@ function Canvas() {
       </Panel>
 
       <Panel position="bottom-center"><ZoomPill /></Panel>
+      <ContextMenuHost anyPinned={anyPinned} />
       {minimap && (
         <MiniMap
           pannable
