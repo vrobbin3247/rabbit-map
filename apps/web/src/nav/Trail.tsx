@@ -13,13 +13,13 @@ export function Trail() {
 
   if (!open) {
     return (
-      <div className="flex h-full w-8 flex-col items-center border-r border-[var(--border)] bg-[var(--panel)] py-2">
-        <button className="btn btn-ghost btn-sm" aria-label="Show trail" title="Show trail" onClick={() => useStore.getState().set({ trailOpen: true })}>»</button>
+      <div className="absolute left-16 top-3 z-10">
+        <button className="btn" aria-label="Show trail" title="Show trail" onClick={() => useStore.getState().set({ trailOpen: true })}>Trail »</button>
       </div>
     );
   }
   return (
-    <nav aria-label="Trail" className="flex h-full w-52 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--panel)]">
+    <nav aria-label="Trail" className="absolute left-16 top-3 z-10 flex max-h-[45%] w-56 flex-col rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--panel)_88%,transparent)] shadow-[var(--shadow)] backdrop-blur">
       <div className="flex items-center justify-between px-3 py-2">
         <h2 className="m-0 text-xs font-semibold uppercase tracking-wide muted">Trail</h2>
         <button className="btn btn-ghost btn-sm" aria-label="Hide trail" onClick={() => useStore.getState().set({ trailOpen: false })}>«</button>

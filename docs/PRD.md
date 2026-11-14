@@ -133,6 +133,13 @@ Precise definitions are in [DATA-MODEL.md](DATA-MODEL.md).
 - **FR-8.4** Collapse and expand a subtree on the canvas.
 - **FR-8.5** Export a map as a folder of Markdown files with `[[wikilinks]]`.
 
+### Board
+
+- **FR-9.1** The learner can drag any node to place it. Placement is saved with the map and survives a reload.
+- **FR-9.2** Nodes the learner has not placed follow their parent when it moves.
+- **FR-9.3** **Tidy up** returns every node to automatic layout.
+- **FR-9.4** The board shows a dotted background, sticky-note nodes coloured by depth, and floating tools, zoom and trail.
+
 ## 8. Non-functional requirements
 
 | ID | Requirement |
@@ -168,4 +175,4 @@ v1 is successful when this walkthrough works end to end with a real provider:
 
 ## 11. Later
 
-Antigravity (Gemini) provider, pre-warmed CLI processes, concepts shared across maps, answers grounded in the learner's own documents, quizzes on visited nodes, manual node positions.
+Antigravity (Gemini) provider, pre-warmed CLI processes, concepts shared across maps, answers grounded in the learner's own documents, quizzes on visited nodes.

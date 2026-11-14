@@ -104,6 +104,14 @@ All fields optional; `settings` is merged field by field. `200` → `{ "map": Ma
 
 All fields optional. Unknown node ids are dropped; `trail` is trimmed to 200. `200` → `{ "view": ViewState }`. Written with a 500 ms debounce.
 
+### `PATCH /maps/:mapId/positions`
+
+```json
+{ "positions": { "01J…": { "x": 420, "y": 130 }, "01J…": null }, "reset": false }
+```
+
+Both fields optional. `positions` pins nodes at board coordinates, or releases them with `null`. `reset: true` releases every node first. Unknown ids are ignored. `200` → `{ "nodes": ConceptNode[] }` (the nodes that changed). `400` for malformed coordinates.
+
 ### `POST /maps/:mapId/export`
 
 Body: `{}`. Writes one Markdown file per node into `<dataDir>/exports/<map title>/`, replacing any earlier export of the same map (see [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md), T6.6).

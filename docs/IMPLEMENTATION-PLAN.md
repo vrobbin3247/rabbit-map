@@ -215,7 +215,6 @@ M1 and M2 do not depend on each other's internals and can be built in either ord
 - Antigravity provider for Google AI Pro (PROVIDERS.md section 6).
 - Pre-started CLI processes to remove the 2.3-second start-up from each call.
 - Token streaming for Codex through its app-server protocol.
-- Manual node positions that survive re-layout.
 - Concepts shared across maps.
 - Explanations grounded in the learner's own documents.
 - Quiz mode over visited nodes.

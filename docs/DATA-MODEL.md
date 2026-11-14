@@ -41,6 +41,7 @@ export interface ConceptNode {
   related: string[];          // node ids recorded as cross-links ("See also")
   thread: ThreadMessage[];    // oldest first
   collapsed: boolean;
+  position?: { x: number; y: number } | null;  // where the learner dragged it; absent or null = automatic layout
   generatedBy: Generation | null;
   createdAt: string;
   updatedAt: string;
@@ -265,6 +266,16 @@ Merge `source` into `target` (different nodes; `source` is not the root; `target
 6. Delete `source`.
 
 Because the old title is now an alias of the target, every existing wikilink to the source resolves to the target.
+
+### 7.9 Positions
+
+`PATCH /positions` takes `{ positions: { [nodeId]: {x, y} | null } }` and/or `{ reset: true }`.
+
+- A position pins a node at those board coordinates. `null` releases it back to automatic layout.
+- Unknown ids are ignored. Coordinates are clamped to ±100,000.
+- `reset: true` clears every position ("Tidy up"); it is applied before any `positions` in the same request.
+- Positions are not part of the tree. Deleting or merging a node needs no clean-up beyond removing the node.
+- Old map files without the field load unchanged.
 
 ### 7.8 View state
 

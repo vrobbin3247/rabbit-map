@@ -59,6 +59,8 @@ export const api = {
   deleteMap: (id: string) => req<void>('DELETE', `/maps/${id}`),
   patchView: (id: string, b: object) => req<{ view: ViewState }>('PATCH', `/maps/${id}/view`, b),
   exportMap: (id: string) => req<{ path: string; files: number }>('POST', `/maps/${id}/export`, {}),
+  patchPositions: (id: string, b: { positions?: Record<string, { x: number; y: number } | null>; reset?: boolean }) =>
+    req<{ nodes: ConceptNode[] }>('PATCH', `/maps/${id}/positions`, b),
   openConcept: (id: string, b: { fromNodeId: string; term: string; snippet?: string }) =>
     req<{ node: ConceptNode; created: boolean }>('POST', `/maps/${id}/nodes`, b),
   patchNode: (id: string, nodeId: string, b: { title?: string; collapsed?: boolean }) =>

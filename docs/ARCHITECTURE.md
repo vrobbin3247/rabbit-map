@@ -208,6 +208,6 @@ Every failure has a code from one list, shared by JSON responses and stream `err
 ## 12. Performance notes
 
 - Starting the Claude CLI costs about 2.3 seconds before the request is sent. Pre-starting a process is a possible later optimisation (see backlog in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)); it is not in v1.
-- Layout runs on every structural change. Dagre handles a few hundred nodes in a few milliseconds; collapsed subtrees are excluded.
+- Layout is two steps. `computeAuto` runs dagre on structural changes only (a few milliseconds for a few hundred nodes; collapsed subtrees are excluded). `placeNodes` applies the learner's positions and runs on every drag event, which is cheap.
 - Cross-link edges are rendered only for the selected node by default, which keeps the edge count low.
 - The link index is rebuilt in memory whenever a map changes. It is a linear pass over the text and is not stored.

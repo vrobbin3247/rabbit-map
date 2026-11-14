@@ -114,9 +114,9 @@ export function MapView() {
       <Banners />
       <TopBar />
       <div className="flex min-h-0 flex-1">
-        <Trail />
         <main className="relative min-w-0 flex-1" aria-label="Map">
           <MapCanvas />
+          <Trail />
         </main>
         <div role="separator" aria-orientation="vertical" aria-label="Resize panel" tabIndex={0} className="w-1.5 shrink-0 cursor-col-resize bg-[var(--border)] hover:bg-[var(--accent)]" onPointerDown={startDrag}
           onKeyDown={(e) => {

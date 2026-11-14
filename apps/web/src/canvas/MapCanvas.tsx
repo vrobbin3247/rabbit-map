@@ -1,19 +1,68 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  Controls,
+  Background,
+  BackgroundVariant,
+  MarkerType,
+  MiniMap,
   Panel,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
   useStoreApi,
+  useViewport,
   type Edge,
+  type NodeChange,
 } from '@xyflow/react';
 import { pathOf, type ConceptNode } from '@mindmapper/shared';
 import { useStore } from '../state/store';
-import { ConceptNodeView, type ConceptFlowNode } from './ConceptNodeView';
-import { NODE_H, NODE_W, computeLayout } from './layout';
+import { ConceptNodeView, TONES, TONE_HEX, type ConceptFlowNode } from './ConceptNodeView';
+import { NODE_H, NODE_W, computeAuto, placeNodes } from './layout';
 
 const nodeTypes = { concept: ConceptNodeView };
+const GRAY = '#94a3b8';
+const ACCENT = '#6366f1';
+const MINIMAP_KEY = 'mindmapper.minimap';
+
+function readMinimap(): boolean {
+  try {
+    // Off by default: it would otherwise sit on top of nodes near the corner.
+    return localStorage.getItem(MINIMAP_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
+
+function Icon({ children }: { children: ReactNode }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {children}
+    </svg>
+  );
+}
+
+function ToolButton({ label, onClick, active, disabled, children }: { label: string; onClick: () => void; active?: boolean; disabled?: boolean; children: ReactNode }) {
+  return (
+    <button className={`tool ${active ? 'on' : ''}`} onClick={onClick} disabled={disabled} aria-label={label} aria-pressed={active} title={label}>
+      <Icon>{children}</Icon>
+    </button>
+  );
+}
+
+function ZoomPill() {
+  const rf = useReactFlow();
+  const { zoom } = useViewport();
+  return (
+    <div className="pill" role="group" aria-label="Zoom">
+      <button className="tool" aria-label="Zoom out" title="Zoom out" onClick={() => void rf.zoomOut({ duration: 150 })}>
+        <Icon><path d="M5 12h14" /></Icon>
+      </button>
+      <button className="zoom-value" title="Reset zoom to 100%" onClick={() => void rf.zoomTo(1, { duration: 150 })}>{Math.round(zoom * 100)}%</button>
+      <button className="tool" aria-label="Zoom in" title="Zoom in" onClick={() => void rf.zoomIn({ duration: 150 })}>
+        <Icon><path d="M12 5v14M5 12h14" /></Icon>
+      </button>
+    </div>
+  );
+}
 
 function Canvas() {
   const map = useStore((s) => s.map)!;
@@ -23,22 +72,26 @@ function Canvas() {
   const flow = useStoreApi();
   const timer = useRef<number | undefined>(undefined);
   const selectedId = map.view.selectedId;
+  const [minimap, setMinimap] = useState(readMinimap);
+  // Positions of nodes being dragged right now; committed to the map when the drag ends.
+  const [live, setLive] = useState<Record<string, { x: number; y: number }>>({});
 
-  const layout = useMemo(() => computeLayout(map, index), [map, index]);
+  const auto = useMemo(() => computeAuto(map, index), [map, index]);
+  const positions = useMemo(() => placeNodes(map, auto, live), [map, auto, live]);
+  const anyPinned = useMemo(() => Object.values(map.nodes).some((n) => n.position), [map]);
 
   const { nodes, edges } = useMemo(() => {
     const path = new Set(selectedId ? pathOf(map, selectedId) : []);
     const visited = new Set(map.view.trail);
-    const nodes: ConceptFlowNode[] = layout.visible.map((id) => {
+    const nodes: ConceptFlowNode[] = auto.visible.map((id) => {
       const n = map.nodes[id] as ConceptNode;
-      const pos = layout.positions.get(id) ?? { x: 0, y: 0 };
       return {
         id,
         type: 'concept',
-        position: pos,
+        position: positions.get(id) ?? { x: 0, y: 0 },
         width: NODE_W,
         height: NODE_H,
-        draggable: false,
+        draggable: true,
         selectable: false,
         connectable: false,
         data: {
@@ -47,20 +100,25 @@ function Canvas() {
           onPath: path.has(id),
           visited: visited.has(id),
           anchor: id === map.view.anchorId,
-          hidden: layout.hidden.get(id) ?? 0,
+          hidden: auto.hidden.get(id) ?? 0,
           questions: n.thread.filter((m) => m.role === 'user').length,
+          depth: index.depth.get(id) ?? 0,
         },
       };
     });
-    const visible = new Set(layout.visible);
-    const edges: Edge[] = layout.edges.map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      className: path.has(e.source) && path.has(e.target) ? 'on-path' : '',
-      selectable: false,
-      focusable: false,
-    }));
+    const visible = new Set(auto.visible);
+    const edges: Edge[] = auto.edges.map((e) => {
+      const onPath = path.has(e.source) && path.has(e.target);
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        className: onPath ? 'on-path' : '',
+        markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: onPath ? ACCENT : GRAY },
+        selectable: false,
+        focusable: false,
+      };
+    });
     // Cross-links: only for the selected node unless the toolbar toggle is on.
     const treeAdjacent = (a: string, b: string) => map.nodes[a]?.parentId === b || map.nodes[b]?.parentId === a;
     const seen = new Set<string>();
@@ -78,12 +136,12 @@ function Canvas() {
       for (const from of index.backLinks.get(selectedId) ?? []) addCross(from, selectedId);
     }
     return { nodes, edges };
-  }, [map, index, layout, selectedId, showAll]);
+  }, [map, index, auto, positions, selectedId, showAll]);
 
   // Centre on the selection only when it is off-screen.
   useEffect(() => {
     if (!selectedId) return;
-    const pos = layout.positions.get(selectedId);
+    const pos = positions.get(selectedId);
     if (!pos) return;
     const { width, height, transform } = flow.getState();
     const [tx, ty, zoom] = transform;
@@ -91,19 +149,23 @@ function Canvas() {
     const y = pos.y * zoom + ty;
     const inside = x >= 0 && y >= 0 && x + NODE_W * zoom <= width && y + NODE_H * zoom <= height;
     if (!inside) void rf.setCenter(pos.x + NODE_W / 2, pos.y + NODE_H / 2, { zoom: Math.max(zoom, 0.6), duration: 250 });
-  }, [selectedId, layout, rf, flow]);
+    // Runs when the selection changes, not on every drag.
+  }, [selectedId]);
 
-  const onMoveEnd = useCallback(
-    (_: unknown, vp: { x: number; y: number; zoom: number }) => {
-      window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => useStore.getState().saveViewport(vp), 800);
-    },
-    [],
-  );
+  const onNodesChange = useCallback((changes: NodeChange<ConceptFlowNode>[]) => {
+    const moved: Record<string, { x: number; y: number }> = {};
+    for (const c of changes) if (c.type === 'position' && c.position) moved[c.id] = c.position;
+    if (Object.keys(moved).length) setLive((prev) => ({ ...prev, ...moved }));
+  }, []);
+
+  const onMoveEnd = useCallback((_: unknown, vp: { x: number; y: number; zoom: number }) => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => useStore.getState().saveViewport(vp), 800);
+  }, []);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const centreOnSelection = () => {
-    const pos = selectedId ? layout.positions.get(selectedId) : null;
+    const pos = selectedId ? positions.get(selectedId) : null;
     if (pos) void rf.setCenter(pos.x + NODE_W / 2, pos.y + NODE_H / 2, { zoom: rf.getZoom(), duration: 250 });
   };
 
@@ -113,14 +175,16 @@ function Canvas() {
       edges={edges}
       nodeTypes={nodeTypes}
       colorMode="system"
-      nodesDraggable={false}
+      onNodesChange={onNodesChange}
+      nodesDraggable
+      nodeDragThreshold={4}
       nodesConnectable={false}
       elementsSelectable={false}
       edgesFocusable={false}
       nodesFocusable={false}
       zoomOnDoubleClick={false}
-      minZoom={0.15}
-      maxZoom={1.6}
+      minZoom={0.1}
+      maxZoom={2}
       defaultViewport={map.view.viewport ?? undefined}
       fitView={!map.view.viewport}
       fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
@@ -129,20 +193,57 @@ function Canvas() {
         const node = map.nodes[n.id];
         if (node && (node.status === 'stub' || node.status === 'error')) void useStore.getState().explain(n.id);
       }}
+      onNodeDragStop={(_, n) => {
+        void useStore.getState().moveNodes({ [n.id]: { x: Math.round(n.position.x), y: Math.round(n.position.y) } });
+        setLive({});
+      }}
       onPaneClick={() => (document.activeElement as HTMLElement | null)?.blur?.()}
       onMoveEnd={onMoveEnd}
       proOptions={{ hideAttribution: true }}
     >
-      <Controls showInteractive={false} position="bottom-left" />
-      <Panel position="top-right">
-        <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-xs">
-          <label className="flex cursor-pointer items-center gap-1">
-            <input type="checkbox" checked={showAll} onChange={(e) => useStore.getState().set({ showAllCrossLinks: e.target.checked })} />
-            All cross-links
-          </label>
-          <button className="btn btn-sm" onClick={centreOnSelection}>Centre</button>
-        </div>
+      <Background variant={BackgroundVariant.Dots} gap={22} size={1.6} />
+
+      <Panel position="top-left" className="toolbar" aria-label="Board tools">
+        <ToolButton label="Fit the whole map" onClick={() => void rf.fitView({ padding: 0.2, maxZoom: 1, duration: 250 })}>
+          <path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4" />
+        </ToolButton>
+        <ToolButton label="Centre on the selected node" onClick={centreOnSelection} disabled={!selectedId}>
+          <circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+        </ToolButton>
+        <span className="sep" aria-hidden />
+        <ToolButton label="Tidy up: put every node back in automatic layout" onClick={() => void useStore.getState().tidyUp()} disabled={!anyPinned}>
+          <rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" />
+        </ToolButton>
+        <ToolButton label="Show all cross-links" active={showAll} onClick={() => useStore.getState().set({ showAllCrossLinks: !showAll })}>
+          <path d="M9 15l6-6" /><path d="M11 6l1-1a4 4 0 015.7 5.7l-1 1M13 18l-1 1a4 4 0 01-5.7-5.7l1-1" />
+        </ToolButton>
+        <ToolButton
+          label={minimap ? 'Hide the minimap' : 'Show the minimap'}
+          active={minimap}
+          onClick={() => {
+            setMinimap(!minimap);
+            try {
+              localStorage.setItem(MINIMAP_KEY, minimap ? 'off' : 'on');
+            } catch {
+              /* storage unavailable */
+            }
+          }}
+        >
+          <rect x="3" y="5" width="18" height="14" rx="2" /><rect x="12" y="11" width="6" height="5" rx="1" />
+        </ToolButton>
       </Panel>
+
+      <Panel position="bottom-center"><ZoomPill /></Panel>
+      {minimap && (
+        <MiniMap
+          pannable
+          zoomable
+          position="bottom-right"
+          nodeStrokeWidth={2}
+          nodeColor={(n) => ((n.data as { node?: ConceptNode })?.node?.status === 'stub' ? '#d6d9df' : (TONE_HEX[((n.data as { depth?: number })?.depth ?? 0) % TONES] as string))}
+          ariaLabel="Minimap"
+        />
+      )}
     </ReactFlow>
   );
 }

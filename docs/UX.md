@@ -44,32 +44,48 @@ There are two screens: **Home** and **Map**.
 
 ## 2. Canvas
 
-- Layout is automatic: a left-to-right tree built from each node's parent. Nodes are not manually positioned in v1.
-- Pan by dragging the background, zoom with the wheel or pinch. **Fit** and **Centre on selection** buttons sit in a corner.
+The canvas is a whiteboard: a dotted board, sticky-note nodes, arrowed connectors and floating controls.
+
+- **Layout** starts automatic (left to right, built from each node's parent). The learner can **drag any node** anywhere; it stays where it was dropped and is saved with the map.
+- **A moved node takes its unplaced branch with it.** Nodes the learner has not moved follow their parent, so dragging a node does not stretch its edges. A node that was moved on its own stays where it is.
+- **Tidy up** releases every moved node back to automatic layout. It is disabled when nothing has been moved.
+- A click selects; a drag (more than 4 px) moves. Pan by dragging the background, zoom with the wheel or pinch.
 - Selecting a node centres it only if it is off-screen.
+
+### Floating controls
+
+| Control | Where | What it does |
+|---|---|---|
+| Board tools | Left, vertical | Fit the whole map, centre on selection, Tidy up, show all cross-links, show or hide the minimap |
+| Zoom pill | Bottom centre | Zoom out, current zoom (click to reset to 100%), zoom in |
+| Trail | Top left, beside the tools | The visited nodes (section 5). Slightly translucent so nodes behind it stay visible. Collapses to a "Trail »" button |
+| Minimap | Bottom right | Off by default, because it sits on top of nodes near the corner. The choice is remembered in this browser |
 
 ### Node appearance
 
+Nodes are sticky notes. The fill colour cycles with depth (yellow, blue, green, pink, orange, purple), so a level reads at a glance. Light and dark themes each have their own set.
+
 | State | Appearance |
 |---|---|
-| `stub` | Dashed outline, muted fill, title and one-line summary |
-| `generating` | Solid outline with a pulse, title, "Writing…" |
-| `ready` | Solid outline and fill, title and one-line summary |
-| `error` | Warning-coloured outline, title, "Could not write this" |
+| `stub` | Dashed outline in the depth colour on a plain card, with the title and one-line summary |
+| `generating` | Filled, pulsing, "Writing…" |
+| `ready` | Filled with a soft shadow, title and one-line summary |
+| `error` | Warning-coloured outline and fill, "Could not write this" |
 
 Modifiers, combined with any state:
 
 - **Selected**: accent ring.
-- **On the current path**: accent outline, and the tree edges along the path are accent-coloured.
-- **Visited** (appears in the trail): full-strength title; unvisited titles are slightly muted.
+- **On the current path**: accent outline, and the connectors along the path are accent-coloured.
+- **Visited** (appears in the trail): title in a heavier weight than unvisited ones.
 - **Anchor**: small anchor badge.
 - **Has questions**: small count badge.
 - **Collapsed**: a "+N" badge showing hidden descendants.
+- **Being dragged**: lifted shadow.
 
-### Edges
+### Connectors
 
-- **Tree edge** (parent to child): solid line.
-- **Cross-link** (a node mentions another node elsewhere in the tree): dashed line, drawn only for the selected or hovered node. A toolbar toggle shows all cross-links.
+- **Tree connector** (parent to child): a smooth grey curve with an arrowhead.
+- **Cross-link** (a node mentions another node elsewhere in the tree): dashed, joining the left sides of the two nodes so it draws a clean arc between stacked nodes. Drawn only for the selected node. The "show all cross-links" tool draws every one.
 - Ghost links are never drawn; they exist only in text.
 
 ## 3. Node panel

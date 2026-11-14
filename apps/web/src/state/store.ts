@@ -72,6 +72,8 @@ interface Store {
   deleteNode(id: string): Promise<void>;
   mergeNode(id: string, intoId: string): Promise<boolean>;
   toggleCollapse(id: string): Promise<void>;
+  moveNodes(positions: Record<string, { x: number; y: number }>): Promise<void>;
+  tidyUp(): Promise<void>;
   deleteMessage(nodeId: string, messageId: string): Promise<void>;
 
   setBanner(b: Banner | null): void;
@@ -385,6 +387,34 @@ export const useStore = create<Store>()((set, get) => {
         applyNodes([(await api.patchNode(m.id, id, { collapsed: !n.collapsed })).node]);
       } catch (e) {
         fail(e);
+      }
+    },
+    async moveNodes(positions) {
+      const m = get().map;
+      if (!m) return;
+      // Apply at once so the node does not jump back while the request is in flight.
+      const nodes = { ...m.nodes };
+      for (const [id, pos] of Object.entries(positions)) {
+        const n = nodes[id];
+        if (n) nodes[id] = { ...n, position: pos };
+      }
+      setMap({ ...m, nodes });
+      try {
+        await api.patchPositions(m.id, { positions });
+      } catch (e) {
+        fail(e);
+        await refreshMap();
+      }
+    },
+    async tidyUp() {
+      const m = get().map;
+      if (!m) return;
+      setMap({ ...m, nodes: Object.fromEntries(Object.entries(m.nodes).map(([id, n]) => [id, { ...n, position: null }])) });
+      try {
+        await api.patchPositions(m.id, { reset: true });
+      } catch (e) {
+        fail(e);
+        await refreshMap();
       }
     },
     async deleteMessage(nodeId, messageId) {

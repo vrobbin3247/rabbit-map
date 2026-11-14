@@ -150,6 +150,22 @@ Entries D-01 to D-15 were made on 2026-11-14 during research and specification, 
 
 ---
 
+### D-20. Dragged nodes are pinned; unplaced branches follow their parent; Tidy up resets
+
+**Decision**: a node the learner drags gets a saved `position`. Nodes without one are laid out automatically and move by the same offset as their parent. "Tidy up" clears all positions.
+
+**Why**: free dragging is what makes it feel like a board. Letting an unplaced branch follow its parent keeps edges short without the learner having to move every child. Because automatic layout stays the default, new nodes always appear in a sensible place.
+
+**Rejected**: dragging a node always moves its whole subtree (cannot move one node alone); every node always free (new children appear far from a moved parent); pinning everything the first time anything is dragged (a later expansion would overlap).
+
+### D-21. Whiteboard look; minimap off by default
+
+**Decision**: dotted board, sticky-note nodes coloured by depth, floating tools, zoom pill and trail, arrowed connectors. The minimap is available but off by default.
+
+**Why**: the first browser test with the minimap on showed it covering the lower nodes at 1280 x 720, so a visible node could not be clicked. Opt-in avoids that.
+
+---
+
 ## Choices that are cheap to change
 
 These were made to keep the build moving. Changing them touches little code.

@@ -18,8 +18,15 @@ function countDescendants(index: MapIndex, id: string): number {
   return n;
 }
 
-/** Left-to-right tree layout. Collapsed subtrees are left out. */
-export function computeLayout(map: MapFile, index: MapIndex): Layout {
+export interface AutoLayout {
+  visible: string[];
+  hidden: Map<string, number>;
+  edges: Layout['edges'];
+  auto: Map<string, { x: number; y: number }>;
+}
+
+/** Left-to-right tree layout from the tree structure alone. Collapsed subtrees are left out. */
+export function computeAuto(map: MapFile, index: MapIndex): AutoLayout {
   const visible: string[] = [];
   const hidden = new Map<string, number>();
   const edges: Layout['edges'] = [];
@@ -40,16 +47,50 @@ export function computeLayout(map: MapFile, index: MapIndex): Layout {
   walk(map.rootId);
 
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: 'LR', nodesep: 20, ranksep: 70, marginx: 20, marginy: 20 });
+  g.setGraph({ rankdir: 'LR', nodesep: 24, ranksep: 80, marginx: 20, marginy: 20 });
   g.setDefaultEdgeLabel(() => ({}));
   for (const id of visible) g.setNode(id, { width: NODE_W, height: NODE_H });
   for (const e of edges) g.setEdge(e.source, e.target);
   dagre.layout(g);
 
-  const positions = new Map<string, { x: number; y: number }>();
+  const auto = new Map<string, { x: number; y: number }>();
   for (const id of visible) {
     const p = g.node(id);
-    positions.set(id, { x: p.x - NODE_W / 2, y: p.y - NODE_H / 2 });
+    auto.set(id, { x: p.x - NODE_W / 2, y: p.y - NODE_H / 2 });
   }
-  return { positions, visible, hidden, edges };
+  return { visible, hidden, edges, auto };
+}
+
+/**
+ * Final positions. A node the learner dragged stays where they put it (`overrides` are positions
+ * being dragged right now). Nodes they have not touched follow their parent, so moving a node
+ * moves its unplaced branch with it instead of stretching the edges.
+ */
+export function placeNodes(
+  map: MapFile,
+  base: AutoLayout,
+  overrides: Record<string, { x: number; y: number }> = {},
+): Map<string, { x: number; y: number }> {
+  const positions = new Map<string, { x: number; y: number }>();
+  const offset = new Map<string, { x: number; y: number }>();
+  const zero = { x: 0, y: 0 };
+  for (const id of base.visible) {
+    const n = map.nodes[id];
+    const a = base.auto.get(id) as { x: number; y: number };
+    const manual = overrides[id] ?? n?.position ?? null;
+    if (manual) {
+      positions.set(id, { x: manual.x, y: manual.y });
+      offset.set(id, { x: manual.x - a.x, y: manual.y - a.y });
+    } else {
+      const po = (n?.parentId ? offset.get(n.parentId) : undefined) ?? zero;
+      positions.set(id, { x: a.x + po.x, y: a.y + po.y });
+      offset.set(id, po);
+    }
+  }
+  return positions;
+}
+
+export function computeLayout(map: MapFile, index: MapIndex): Layout {
+  const base = computeAuto(map, index);
+  return { positions: placeNodes(map, base), visible: base.visible, hidden: base.hidden, edges: base.edges };
 }

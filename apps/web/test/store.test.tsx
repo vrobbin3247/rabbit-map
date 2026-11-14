@@ -151,6 +151,35 @@ describe('explain', () => {
   });
 });
 
+describe('moving nodes', () => {
+  it('applies the position at once and saves it', async () => {
+    const f = vi.fn(async () => jsonResponse({ nodes: [] }));
+    vi.stubGlobal('fetch', f);
+    const p = st().moveNodes({ c: { x: 40, y: 50 } });
+    expect(st().map!.nodes.c!.position).toEqual({ x: 40, y: 50 }); // before the request finishes
+    await p;
+    const call = f.mock.calls.find((c) => String((c as unknown[])[0]).endsWith('/positions')) as unknown as [string, RequestInit];
+    expect(call[1].method).toBe('PATCH');
+    expect(JSON.parse(call[1].body as string)).toEqual({ positions: { c: { x: 40, y: 50 } } });
+  });
+
+  it('tidy up clears every position', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ nodes: [] })));
+    await st().moveNodes({ c: { x: 1, y: 2 }, t: { x: 3, y: 4 } });
+    await st().tidyUp();
+    expect(Object.values(st().map!.nodes).every((n) => !n.position)).toBe(true);
+  });
+
+  it('re-reads the map when saving fails', async () => {
+    const server = sampleMap();
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) =>
+      init?.method === 'PATCH' ? jsonResponse({ error: { code: 'storage_failed', message: 'disk full' } }, 500) : jsonResponse({ map: server })));
+    await st().moveNodes({ c: { x: 9, y: 9 } });
+    expect(st().banner?.text).toBe('disk full');
+    expect(st().map!.nodes.c!.position ?? null).toBeNull();
+  });
+});
+
 describe('structure changes', () => {
   it('delete applies removed ids and cleans the forward stack', async () => {
     st().select('c');

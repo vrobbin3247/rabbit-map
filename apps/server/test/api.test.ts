@@ -385,6 +385,54 @@ describe('management', () => {
   });
 });
 
+describe('positions', () => {
+  it('pins nodes, persists them, and tidy-up releases them', async () => {
+    const map = await newMap('Topic');
+    await env.stream(`/api/maps/${map.id}/nodes/${map.rootId}/expand`);
+    const m = await getMap(map.id);
+    const a = byTitle(m, 'Topic Part A');
+    const b = byTitle(m, 'Topic Part B');
+    expect(a.position ?? null).toBeNull();
+
+    const r = await env.json('PATCH', `/api/maps/${map.id}/positions`, {
+      positions: { [a.id]: { x: 120.5, y: -40 }, [b.id]: { x: 1e9, y: 3 }, bogus: { x: 1, y: 1 } },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.nodes.map((n: ConceptNode) => n.id).sort()).toEqual([a.id, b.id].sort());
+    const after = await getMap(map.id);
+    expect(after.nodes[a.id]?.position).toEqual({ x: 120.5, y: -40 });
+    expect(after.nodes[b.id]?.position).toEqual({ x: 1e5, y: 3 }); // clamped
+    expectValid(after);
+
+    await env.store.flush();
+    expect((await new MapStore(env.config.mapsDir).get(map.id)).nodes[a.id]?.position).toEqual({ x: 120.5, y: -40 });
+
+    // release one node
+    await env.json('PATCH', `/api/maps/${map.id}/positions`, { positions: { [b.id]: null } });
+    expect((await getMap(map.id)).nodes[b.id]?.position).toBeNull();
+
+    // tidy up releases everything
+    const reset = await env.json('PATCH', `/api/maps/${map.id}/positions`, { reset: true });
+    expect(reset.body.nodes.map((n: ConceptNode) => n.id)).toEqual([a.id]);
+    expect((await getMap(map.id)).nodes[a.id]?.position).toBeNull();
+  });
+
+  it('rejects malformed bodies', async () => {
+    const map = await newMap();
+    expect((await env.json('PATCH', `/api/maps/${map.id}/positions`, { positions: { x: { x: 'a', y: 1 } } })).status).toBe(400);
+    expect((await env.json('PATCH', `/api/maps/${map.id}/positions`, { nope: 1 })).status).toBe(400);
+  });
+
+  it('old map files without positions still load', async () => {
+    const map = await newMap();
+    await env.store.flush();
+    const doc = JSON.parse(readFileSync(path.join(env.config.mapsDir, `${map.id}.json`), 'utf8')) as MapFile;
+    for (const n of Object.values(doc.nodes)) delete (n as { position?: unknown }).position;
+    writeFileSync(path.join(env.config.mapsDir, `${map.id}.json`), JSON.stringify(doc));
+    expect((await new MapStore(env.config.mapsDir).get(map.id)).rootId).toBe(map.rootId);
+  });
+});
+
 describe('storage', () => {
   it('reports a corrupt file without overwriting it, and repairs interrupted generations on load', async () => {
     const map = await newMap();

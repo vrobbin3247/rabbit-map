@@ -367,6 +367,30 @@ export function mergeNodes(map: MapFile, sourceId: string, targetId: string): { 
   return { removedIds: [sourceId], changedIds: [...changed] };
 }
 
+/** Pin nodes where the learner dropped them, or release them (null) back to automatic layout. */
+export function setPositions(map: MapFile, positions: Record<string, { x: number; y: number } | null>): string[] {
+  const changed: string[] = [];
+  for (const [id, pos] of Object.entries(positions)) {
+    const n = map.nodes[id];
+    if (!n) continue;
+    // Keep coordinates within a sane range so a bad request cannot push the board off to infinity.
+    n.position = pos ? { x: Math.max(-1e5, Math.min(1e5, pos.x)), y: Math.max(-1e5, Math.min(1e5, pos.y)) } : null;
+    changed.push(id);
+  }
+  return changed;
+}
+
+export function resetPositions(map: MapFile): string[] {
+  const changed: string[] = [];
+  for (const n of Object.values(map.nodes)) {
+    if (n.position) {
+      n.position = null;
+      changed.push(n.id);
+    }
+  }
+  return changed;
+}
+
 export function patchView(
   map: MapFile,
   patch: { selectedId?: string | null; anchorId?: string; trail?: string[]; viewport?: MapFile['view']['viewport'] },

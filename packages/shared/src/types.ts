@@ -10,6 +10,7 @@ import type {
   MapSummarySchema,
   NodeStatusSchema,
   OriginSchema,
+  PositionSchema,
   ProviderIdSchema,
   ThreadMessageSchema,
   ViewStateSchema,
@@ -21,6 +22,7 @@ export type Level = z.infer<typeof LevelSchema>;
 export type NodeStatus = z.infer<typeof NodeStatusSchema>;
 export type ErrorInfo = z.infer<typeof ErrorInfoSchema>;
 export type Generation = z.infer<typeof GenerationSchema>;
+export type Position = z.infer<typeof PositionSchema>;
 export type Origin = z.infer<typeof OriginSchema>;
 export type ThreadMessage = z.infer<typeof ThreadMessageSchema>;
 export type ConceptNode = z.infer<typeof ConceptNodeSchema>;

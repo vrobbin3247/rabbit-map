@@ -109,6 +109,56 @@ test('PRD walkthrough: map, explain, links, shared concept, question, ghost link
   await expect(panel(page).getByText(/Answer about/)).toBeVisible();
 });
 
+test('drag a node: it moves, stays put after reload, its unplaced branch follows, Tidy up resets', async ({ page, request }) => {
+  await create(page, 'Dragging');
+  await written(page);
+  const a = node(page, 'Dragging Part A');
+  const b = node(page, 'Dragging Part B');
+  const box = async (l: ReturnType<typeof node>) => (await l.boundingBox())!;
+
+  // a plain click still selects (it may pan the board, so measure afterwards)
+  await a.click();
+  await expect(panel(page).getByRole('heading', { name: 'Dragging Part A' })).toBeVisible();
+  await page.waitForTimeout(400);
+  const a0 = await box(a);
+  const b0 = await box(b);
+
+  // drag Part A down and to the right
+  await page.mouse.move(a0.x + 40, a0.y + 30);
+  await page.mouse.down();
+  await page.mouse.move(a0.x + 120, a0.y + 90, { steps: 6 });
+  await page.mouse.move(a0.x + 200, a0.y + 160, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await box(a)).x - a0.x)).toBeGreaterThan(120);
+  const a1 = await box(a);
+  expect(Math.round(a1.y - a0.y)).toBeGreaterThan(100);
+  const b1 = await box(b);
+  expect(Math.round(Math.abs(b1.x - b0.x))).toBeLessThan(3); // siblings do not move
+  expect(Math.round(Math.abs(b1.y - b0.y))).toBeLessThan(3);
+
+  // the position was saved on the server
+  const mapId = ((await (await request.get('/api/maps')).json()).maps as { id: string; title: string }[]).find((m) => m.title === 'Dragging')!.id;
+  const saved = async () => Object.values(((await (await request.get(`/api/maps/${mapId}`)).json()).map.nodes) as Record<string, { title: string; position?: { x: number; y: number } | null }>);
+  await expect.poll(async () => (await saved()).find((n) => n.title === 'Dragging Part A')?.position?.x ?? null).not.toBeNull();
+  expect((await saved()).filter((n) => n.position).map((n) => n.title)).toEqual(['Dragging Part A']);
+
+  // reload and reopen: still there
+  await page.waitForTimeout(900);
+  await page.reload();
+  await page.getByRole('button', { name: /Dragging/ }).first().click();
+  const a2 = await box(node(page, 'Dragging Part A'));
+  const b2 = await box(node(page, 'Dragging Part B'));
+  expect(Math.round(a2.x - b2.x)).toBeGreaterThan(100); // A is still well to the right of B
+  expect(Math.round(a2.y - b2.y)).toBeGreaterThan(50);
+
+  // Tidy up puts it back
+  await page.getByRole('button', { name: /^Tidy up/ }).click();
+  await expect.poll(async () => (await saved()).filter((n) => n.position).length).toBe(0);
+  await expect.poll(async () => Math.round(Math.abs((await box(node(page, 'Dragging Part A'))).x - (await box(node(page, 'Dragging Part B'))).x))).toBeLessThan(3);
+  await expect(page.getByRole('button', { name: /^Tidy up/ })).toBeDisabled();
+  await page.screenshot({ path: 'test-results/fake-board.png' });
+});
+
 test('Stop returns a node to its previous state', async ({ page }) => {
   await create(page, 'Waiting __hang__');
   await expect(panel(page).getByRole('button', { name: /^Stop/ })).toBeVisible();

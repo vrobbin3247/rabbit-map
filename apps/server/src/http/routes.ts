@@ -6,6 +6,7 @@ import {
   OpenConceptBodySchema,
   PatchMapBodySchema,
   PatchNodeBodySchema,
+  PatchPositionsBodySchema,
   PatchViewBodySchema,
   type ConceptNode,
   type ProviderId,
@@ -23,6 +24,8 @@ import {
   openConcept,
   patchView,
   renameNode,
+  resetPositions,
+  setPositions,
 } from '../store/mutations';
 import { ULID_RE } from '../ids';
 import { parseBody, type Deps } from './app';
@@ -102,6 +105,17 @@ export function registerRoutes(app: Hono, deps: Deps): void {
     const body = await parseBody(c, PatchViewBodySchema);
     await store.mutate(mapId, (m) => patchView(m, body), { deferWrite: true });
     return c.json({ view: (await store.get(mapId)).view });
+  });
+
+  app.patch('/api/maps/:mapId/positions', async (c) => {
+    const mapId = id(c.req.param('mapId'));
+    const body = await parseBody(c, PatchPositionsBodySchema);
+    const changed = await store.mutate(mapId, (m) => [
+      ...(body.reset ? resetPositions(m) : []),
+      ...(body.positions ? setPositions(m, body.positions) : []),
+    ]);
+    const after = await store.get(mapId);
+    return c.json({ nodes: [...new Set(changed)].map((i) => after.nodes[i]).filter(Boolean) });
   });
 
   app.post('/api/maps/:mapId/export', async (c) => {

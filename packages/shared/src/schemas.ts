@@ -32,6 +32,8 @@ export const GenerationSchema = z.object({
   metaRecovered: z.boolean(),
 });
 
+export const PositionSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
+
 export const OriginSchema = z.object({ nodeId: z.string(), snippet: z.string() });
 
 export const ThreadMessageSchema = z.object({
@@ -58,6 +60,8 @@ export const ConceptNodeSchema = z.object({
   related: z.array(z.string()),
   thread: z.array(ThreadMessageSchema),
   collapsed: z.boolean(),
+  /** Where the learner dragged this node on the board. Absent or null means automatic layout. */
+  position: PositionSchema.nullable().optional(),
   generatedBy: GenerationSchema.nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -139,6 +143,14 @@ export const PatchNodeBodySchema = z
   .object({
     title: z.string().trim().min(1).max(LIMITS.titleMax).optional(),
     collapsed: z.boolean().optional(),
+  })
+  .strict();
+
+/** Set (object) or clear (null) manual positions; `reset: true` clears every one ("Tidy up"). */
+export const PatchPositionsBodySchema = z
+  .object({
+    positions: z.record(z.string(), PositionSchema.nullable()).optional(),
+    reset: z.boolean().optional(),
   })
   .strict();
 

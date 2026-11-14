@@ -84,8 +84,13 @@ export class FakeProvider implements Provider {
     const wait = (ms: number) =>
       new Promise<void>((resolve) => {
         if (ms <= 0) return resolve();
-        const t = setTimeout(resolve, ms);
-        req.signal.addEventListener('abort', () => (clearTimeout(t), resolve()), { once: true });
+        const done = () => {
+          clearTimeout(t);
+          req.signal.removeEventListener('abort', done);
+          resolve();
+        };
+        const t = setTimeout(done, ms);
+        req.signal.addEventListener('abort', done, { once: true });
       });
 
     for (let i = 0; i < chunks.length; i++) {
