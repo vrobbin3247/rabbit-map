@@ -232,10 +232,14 @@ async function runAsk(
     delta.flush();
     await Promise.all(pending);
 
-    const text = parseAskOutput(result.text);
-    await store.mutate(mapId, (m) => finishAsk(m, nodeId, s.assistantId, text, generation(provider, result.model, Date.now() - t0, false)));
+    const changed = await store.mutate(mapId, (m) => {
+      const n = m.nodes[nodeId];
+      if (!n) throw new AppError('not_found', 'The node was removed while it was being written.');
+      const parsed = parseAskOutput(result.text, n.title, n.aliases);
+      return finishAsk(m, nodeId, s.assistantId, parsed.text, generation(provider, result.model, Date.now() - t0, false), parsed.children);
+    });
     const after = await store.get(mapId);
-    await safeEmit(emit, { event: 'done', data: { nodes: [after.nodes[nodeId] as ConceptNode] } });
+    await safeEmit(emit, { event: 'done', data: { nodes: changed.map((id) => after.nodes[id]).filter((n): n is ConceptNode => !!n) } });
   } catch (e) {
     await Promise.all(pending).catch(() => undefined);
     const err = toError(e);

@@ -63,6 +63,20 @@ function parseTail(tail: string): unknown {
 
 const unbracket = (s: string) => s.replace(/\[\[|\]\]/g, '').trim();
 
+/** Trim, unbracket, de-duplicate and cap suggested children. `seen` starts with the node's own slugs. */
+function cleanChildren(children: { title: string; summary: string }[], seen: Set<string>, max: number): ParsedChild[] {
+  const out: ParsedChild[] = [];
+  for (const c of children) {
+    const title = unbracket(c.title);
+    const slug = toSlug(title);
+    if (!title || title.length > LIMITS.titleMax || !slug || seen.has(slug)) continue;
+    seen.add(slug);
+    out.push({ title, summary: c.summary.trim().slice(0, LIMITS.summaryMax) });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 /**
  * Split a model reply into explanation body and metadata. Never throws for bad metadata:
  * missing or invalid metadata is rebuilt from the links in the text.
@@ -89,16 +103,7 @@ export function parseExpandOutput(
 
   if (parsed?.success) {
     const m = parsed.data;
-    const seen = new Set(ownSlugs);
-    const children: ParsedChild[] = [];
-    for (const c of m.children) {
-      const title = unbracket(c.title);
-      const slug = toSlug(title);
-      if (!title || title.length > LIMITS.titleMax || !slug || seen.has(slug)) continue;
-      seen.add(slug);
-      children.push({ title, summary: c.summary.trim().slice(0, LIMITS.summaryMax) });
-      if (children.length >= LIMITS.childrenMax) break;
-    }
+    const children = cleanChildren(m.children, new Set(ownSlugs), LIMITS.childrenMax);
     const aliasSeen = new Set<string>();
     const aliases: string[] = [];
     for (const a of m.aliases) {
@@ -131,11 +136,25 @@ export function parseExpandOutput(
   return { body, summary: firstSentence(body), aliases: [], children, metaRecovered: true };
 }
 
-export function parseAskOutput(text: string): string {
-  const { body } = splitAtMeta(text);
+export interface ParsedAsk {
+  text: string;
+  /** Concepts the answer introduced, to become stubs under the node. Empty when the model gave none. */
+  children: ParsedChild[];
+}
+
+/**
+ * Split an answer into its text and the concepts it suggests. Unlike an explanation there is no
+ * fallback: without valid metadata the answer simply adds no nodes, and its links stay ghost links.
+ */
+export function parseAskOutput(text: string, nodeTitle = '', nodeAliases: string[] = []): ParsedAsk {
+  const { body, tail } = splitAtMeta(text);
   const out = body.trim();
   if (!out) throw new EmptyOutputError();
-  return out;
+  const raw = tail === null ? undefined : parseTail(tail);
+  const parsed = raw === undefined ? undefined : MetaSchema.safeParse(raw);
+  const own = new Set([toSlug(nodeTitle), ...nodeAliases.map(toSlug)]);
+  const children = parsed?.success ? cleanChildren(parsed.data.children, own, 5) : [];
+  return { text: out, children };
 }
 
 const DELIM = '\n' + META_DELIMITER;

@@ -2,14 +2,16 @@
  * One real call through a real provider. Spends a little of the user's plan quota, so run it by hand:
  *   npm run smoke -- claude [--model haiku] [--record file.jsonl]
  *   npm run smoke -- codex
+ *   npm run smoke -- claude --ask "what are different paddings"   (a question on a Padding node)
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { StreamFilter, buildIndex, parseExpandOutput, resolve } from '@mindmapper/shared';
+import { StreamFilter, buildIndex, parseAskOutput, parseExpandOutput, resolve } from '@mindmapper/shared';
 import { ensureDirs, loadConfig } from '../apps/server/src/config';
 import { buildExpandPrompt } from '../apps/server/src/generation/context';
 import { Registry } from '../apps/server/src/providers/registry';
-import { createMap, finishExpand, startExpand } from '../apps/server/src/store/mutations';
+import { buildAskPrompt } from '../apps/server/src/generation/context';
+import { createMap, finishAsk, finishExpand, openConcept, startAsk, startExpand } from '../apps/server/src/store/mutations';
 
 const args = process.argv.slice(2);
 const id = args[0] as 'claude' | 'codex' | undefined;
@@ -33,6 +35,37 @@ console.log('Provider status:', JSON.stringify({ ...status }, null, 2));
 if (!status.usable) {
   console.error(`\nNot usable: ${status.reason ?? ''} ${status.fix ?? ''}`);
   process.exit(1);
+}
+
+const askQuestion = flag('--ask');
+if (askQuestion) {
+  const m = createMap('Deep learning', { level: 'beginner', goal: null, provider: id, model: flag('--model') ?? null });
+  const gen = { provider: id, model: null, at: '', durationMs: 0, metaRecovered: false };
+  startExpand(m, m.rootId);
+  finishExpand(m, m.rootId, { body: 'Overview.', summary: 'Neural networks with many layers.', aliases: [], children: [{ title: 'Convolutional Neural Network', summary: 'Image models.' }], metaRecovered: false }, gen);
+  const cnnId = Object.values(m.nodes).find((n) => n.title === 'Convolutional Neural Network')!.id;
+  startExpand(m, cnnId);
+  finishExpand(m, cnnId, { body: 'A CNN slides small filters across an image.', summary: 'Image models.', aliases: ['CNN'], children: [{ title: 'Convolution', summary: 'Sliding a filter over an image.' }, { title: 'Stride', summary: 'How far the filter moves each step.' }], metaRecovered: false }, gen);
+  const conv = Object.values(m.nodes).find((n) => n.title === 'Convolution')!;
+  const padding = openConcept(m, conv.id, 'Padding').node;
+  startExpand(m, padding.id);
+  finishExpand(m, padding.id, { body: 'Padding adds border zeros around an image before convolution so the output does not shrink.', summary: 'Adding border zeros around images before convolution.', aliases: [], children: [], metaRecovered: false }, gen);
+
+  const started = startAsk(m, padding.id, { question: askQuestion });
+  const { system, prompt } = buildAskPrompt(m, padding.id, started.question, null);
+  const ac = new AbortController();
+  const t = Date.now();
+  const result = await provider.generate({ system, prompt, model: m.settings.model, signal: ac.signal });
+  const parsed = parseAskOutput(result.text, padding.title, padding.aliases);
+  const changed = finishAsk(m, padding.id, started.assistantId, parsed.text, gen, parsed.children);
+  console.log('\n--- ANSWER ---\n' + parsed.text);
+  console.log(`\n--- RESULT ---\ntotal: ${((Date.now() - t) / 1000).toFixed(1)}s   tokens:`, result.usage);
+  console.log('suggested children:', parsed.children);
+  console.log('nodes created under Padding:', changed.slice(1).map((i) => m.nodes[i]?.title));
+  console.log('cross-links (See also):', m.nodes[padding.id]?.related.map((i) => m.nodes[i]?.title));
+  const links = [...parsed.text.matchAll(/\[\[([^\]|]+)/g)].map((x) => x[1]);
+  console.log('links in answer:', links, ' all resolve to nodes:', links.every((l) => Object.values(m.nodes).some((n) => n.title.toLowerCase() === (l ?? '').toLowerCase())));
+  process.exit(0);
 }
 
 const map = createMap('Deep learning', { level: 'beginner', goal: null, provider: id, model: flag('--model') ?? null });

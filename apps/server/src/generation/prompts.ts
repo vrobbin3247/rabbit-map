@@ -32,8 +32,12 @@ function expandFormat(root: boolean): string {
 children: the ${minC} to ${maxC} concepts to open next in order to understand this one more deeply, most important first. Each must be a part, mechanism or direct prerequisite of this concept, not one of its ancestors. Link each child in the explanation where it fits naturally.`;
 }
 
-const ASK_FORMAT =
-  'Output format: the answer in Markdown, at most 250 words, and nothing else. Do not write ===META===.';
+const ASK_FORMAT = `Output format, exactly:
+1. The answer in Markdown, at most 250 words. Wrap in [[double brackets]] every distinct concept, type, kind or step that you name and that a learner could study on its own, even when you also write it in bold. For example: [[Same Padding|same padding]].
+2. Only if you named such concepts: a line containing only ===META=== and then one JSON object, with no code fence and nothing after it:
+{"children": [{"title": "<concept name>", "summary": "<one sentence, at most 25 words>"}]}
+children: up to 5 of those concepts, most important first. A title must make sense on its own, for example "Same Padding" rather than "Same". Leave out anything the node itself or one of its ancestors already covers.
+If you named no such concepts, write no ===META=== line at all.`;
 
 export function buildSystem(level: Level, kind: PromptKind): string {
   const format = kind === 'ask' ? ASK_FORMAT : expandFormat(kind === 'root');

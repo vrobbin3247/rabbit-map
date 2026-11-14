@@ -109,6 +109,31 @@ test('PRD walkthrough: map, explain, links, shared concept, question, ghost link
   await expect(panel(page).getByText(/Answer about/)).toBeVisible();
 });
 
+test('a question that names kinds of a concept adds them as nodes on the board', async ({ page }) => {
+  await create(page, 'Padding');
+  await written(page);
+  await node(page, 'Padding Part A').click();
+  await expect(node(page, 'Padding Part A Kind One')).toHaveCount(0);
+  const ask = panel(page).getByPlaceholder('Ask about Padding Part A…');
+  await ask.fill('what are the different kinds? __children__');
+  await ask.press('Enter');
+  await expect(panel(page).getByText(/Answer about/)).toBeVisible();
+
+  // the nodes appear on the board, and as next concepts in the panel
+  await expect(node(page, 'Padding Part A Kind One')).toBeVisible();
+  await expect(node(page, 'Padding Part A Kind Two')).toBeVisible();
+  await expect(panel(page).getByText('Next concepts')).toBeVisible();
+  await expect(panel(page).locator('section', { hasText: 'Next concepts' }).getByRole('button', { name: 'Padding Part A Kind One', exact: true })).toBeVisible();
+
+  // the links in the answer are solid links to those nodes, and following one opens the node
+  const link = panel(page).locator('[data-concept="Padding Part A Kind Two"]');
+  await expect(link).toHaveAttribute('data-existing', 'true');
+  await link.click();
+  await expect(panel(page).getByRole('heading', { name: 'Padding Part A Kind Two' })).toBeVisible();
+  await expect(panel(page).getByRole('button', { name: 'Explain' })).toBeVisible(); // a stub, not yet written
+  await expect(page.getByRole('navigation', { name: 'Path from the root' })).toContainText('Padding Part A');
+});
+
 test('drag a node: it moves, stays put after reload, its unplaced branch follows, Tidy up resets', async ({ page, request }) => {
   await create(page, 'Dragging');
   await written(page);

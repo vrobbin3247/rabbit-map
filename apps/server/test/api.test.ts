@@ -270,6 +270,60 @@ describe('failures', () => {
   });
 });
 
+describe('questions that name concepts', () => {
+  it('adds them as stubs under the node, links the answer, and reuses existing concepts', async () => {
+    const map = await newMap('Topic');
+    await env.stream(`/api/maps/${map.id}/nodes/${map.rootId}/expand`);
+    let m = await getMap(map.id);
+    const a = byTitle(m, 'Topic Part A');
+    const shared = byTitle(m, 'Shared Concept');
+    const before = Object.keys(m.nodes).length;
+
+    const r = await env.stream(`/api/maps/${map.id}/nodes/${a.id}/ask`, { question: 'what kinds are there? __children__' });
+    const done: any = r.events.at(-1);
+    expect(done.event).toBe('done');
+    // the stream carries the node and the new stubs, so the board can draw them at once
+    expect(names(done.data.nodes)).toEqual(['Topic Part A', 'Topic Part A Kind One', 'Topic Part A Kind Two']);
+    const streamed = r.events.filter((e) => e.event === 'delta').map((e: any) => e.data.text).join('');
+    expect(streamed).not.toContain('===META');
+
+    m = await getMap(map.id);
+    expect(Object.keys(m.nodes).length).toBe(before + 2);
+    const one = byTitle(m, 'Topic Part A Kind One');
+    expect(one).toMatchObject({ parentId: a.id, status: 'stub', summary: 'First kind of Topic Part A.' });
+    expect(one.origin?.snippet).toContain('Kinds:');
+    expect(m.nodes[a.id]?.related).toContain(shared.id); // already existed elsewhere: cross-link, not a copy
+    expect(Object.values(m.nodes).filter((n) => n.title === 'Shared Concept')).toHaveLength(1);
+    // the saved answer is the text only, and its links now resolve to the new nodes
+    const answer = m.nodes[a.id]!.thread.at(-1)!.text;
+    expect(answer).toContain('[[Topic Part A Kind One]]');
+    expect(answer).not.toContain('===META');
+    expectValid(m);
+
+    // asking again does not duplicate them
+    await env.stream(`/api/maps/${map.id}/nodes/${a.id}/ask`, { question: 'again? __children__' });
+    expect(Object.keys((await getMap(map.id)).nodes).length).toBe(before + 2);
+  });
+
+  it('an ordinary answer adds no nodes', async () => {
+    const map = await newMap('Topic');
+    await env.stream(`/api/maps/${map.id}/nodes/${map.rootId}/expand`);
+    const before = Object.keys((await getMap(map.id)).nodes).length;
+    const r = await env.stream(`/api/maps/${map.id}/nodes/${map.rootId}/ask`, { question: 'plain question' });
+    expect(names((r.events.at(-1) as any).data.nodes)).toEqual(['Topic']);
+    expect(Object.keys((await getMap(map.id)).nodes).length).toBe(before);
+  });
+
+  it('a stub that is asked about gets children too', async () => {
+    const map = await newMap('Topic');
+    const r = await env.stream(`/api/maps/${map.id}/nodes/${map.rootId}/ask`, { question: 'kinds? __children__' });
+    expect((r.events.at(-1) as any).event).toBe('done');
+    const m = await getMap(map.id);
+    expect(m.nodes[map.rootId]?.status).toBe('stub');
+    expect(Object.values(m.nodes).filter((n) => n.parentId === map.rootId).map((n) => n.title).sort()).toEqual(['Shared Concept', 'Topic Kind One', 'Topic Kind Two']);
+  });
+});
+
 describe('management', () => {
   async function built() {
     const map = await newMap('Topic');

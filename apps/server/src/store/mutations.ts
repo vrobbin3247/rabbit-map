@@ -12,6 +12,7 @@ import {
   type ErrorInfo,
   type Generation,
   type MapFile,
+  type MapIndex,
   type MapSettings,
   type ParsedExpand,
   type ThreadMessage,
@@ -119,6 +120,45 @@ function snippetFor(body: string, slug: string): string {
   return squash(stripWikilinks(body.slice(a, b))).slice(0, LIMITS.snippetMax);
 }
 
+/**
+ * Turn suggested concepts into stubs under `n`. A concept that already exists is not duplicated:
+ * it becomes a cross-link ("See also"), unless it is `n` itself, an ancestor, or already a child.
+ * Returns the ids of nodes created.
+ */
+function attachChildren(
+  map: MapFile,
+  n: ConceptNode,
+  children: { title: string; summary: string }[],
+  text: string,
+  index: MapIndex = buildIndex(map),
+): string[] {
+  const created: string[] = [];
+  const ownSlug = toSlug(n.title);
+  let processed = 0;
+  for (const child of children) {
+    if (processed >= LIMITS.childrenMax) break;
+    const slug = toSlug(child.title);
+    if (!slug || slug === ownSlug) continue;
+    const existingId = index.slugToId.get(slug);
+    if (existingId) {
+      if (existingId === n.id || isAncestor(map, existingId, n.id)) continue;
+      if (map.nodes[existingId]?.parentId === n.id) continue;
+      if (!n.related.includes(existingId)) n.related.push(existingId);
+      processed++;
+      continue;
+    }
+    const id = newId();
+    map.nodes[id] = blankNode(id, child.title, n.id, {
+      summary: child.summary,
+      origin: { nodeId: n.id, snippet: snippetFor(text, slug) },
+    });
+    index.slugToId.set(slug, id);
+    created.push(id);
+    processed++;
+  }
+  return created;
+}
+
 /** DATA-MODEL.md 7.2. Returns ids of every node created or changed. */
 export function finishExpand(map: MapFile, nodeId: string, parsed: ParsedExpand, gen: Generation): string[] {
   const n = node(map, nodeId);
@@ -139,28 +179,7 @@ export function finishExpand(map: MapFile, nodeId: string, parsed: ParsedExpand,
   }
   index = buildIndex(map);
 
-  let processed = 0;
-  for (const child of parsed.children) {
-    if (processed >= LIMITS.childrenMax) break;
-    const slug = toSlug(child.title);
-    if (!slug || slug === ownSlug) continue;
-    const existingId = index.slugToId.get(slug);
-    if (existingId) {
-      if (existingId === n.id || isAncestor(map, existingId, n.id)) continue;
-      if (map.nodes[existingId]?.parentId === n.id) continue;
-      if (!n.related.includes(existingId)) n.related.push(existingId);
-      processed++;
-      continue;
-    }
-    const id = newId();
-    map.nodes[id] = blankNode(id, child.title, n.id, {
-      summary: child.summary,
-      origin: { nodeId: n.id, snippet: snippetFor(parsed.body, slug) },
-    });
-    index.slugToId.set(slug, id);
-    changed.add(id);
-    processed++;
-  }
+  for (const id of attachChildren(map, n, parsed.children, parsed.body, index)) changed.add(id);
 
   n.status = 'ready';
   n.error = null;
@@ -214,15 +233,24 @@ export function startAsk(
   return { question, quote, userId, assistantId, restore };
 }
 
-export function finishAsk(map: MapFile, nodeId: string, assistantId: string, text: string, gen: Generation): void {
+/** Save the answer and add the concepts it introduced as stubs. Returns ids of nodes created or changed. */
+export function finishAsk(
+  map: MapFile,
+  nodeId: string,
+  assistantId: string,
+  text: string,
+  gen: Generation,
+  children: { title: string; summary: string }[] = [],
+): string[] {
   const n = node(map, nodeId);
   const m = n.thread.find((x) => x.id === assistantId);
-  if (!m) return;
+  if (!m) return [nodeId];
   m.text = text;
   m.status = 'ready';
   m.error = null;
   m.generatedBy = gen;
   n.updatedAt = now();
+  return [nodeId, ...attachChildren(map, n, children, text)];
 }
 
 export function failAsk(map: MapFile, nodeId: string, assistantId: string, error: ErrorInfo): void {

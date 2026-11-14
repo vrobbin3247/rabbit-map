@@ -67,7 +67,15 @@ export class FakeProvider implements Provider {
     }
     if (question !== null) {
       const n = field(prompt, 'NODE') ?? 'this node';
-      return `Answer about **${n}**: ${question}. See [[${SHARED}]] and [[${n} Detail]].`;
+      const text = `Answer about **${n}**: ${question}. See [[${SHARED}]] and [[${n} Detail]].`;
+      if (!trigger.includes('__children__')) return text;
+      // Like a real answer that names kinds of the concept: link them and suggest them as nodes.
+      const kids = [
+        { title: `${n} Kind One`, summary: `First kind of ${n}.` },
+        { title: `${n} Kind Two`, summary: `Second kind of ${n}.` },
+        { title: SHARED, summary: 'A concept every node refers to.' },
+      ];
+      return `${text} Kinds: [[${n} Kind One]] and [[${n} Kind Two]].\n\n===META===\n${JSON.stringify({ children: kids })}`;
     }
     return 'Fake provider: no task found in prompt.';
   }

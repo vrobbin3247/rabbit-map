@@ -79,7 +79,11 @@ describe('context', () => {
     }
     const { system, prompt } = buildAskPrompt(m, m.rootId, 'new question?', 'some quote');
     expect(system).toContain('at most 250 words');
-    expect(system).not.toContain('"children"');
+    // an answer may suggest concepts, but has no summary or aliases of its own
+    expect(system).toContain('"children"');
+    expect(system).toContain('up to 5');
+    expect(system).not.toContain('"aliases"');
+    expect(system).toContain('write no ===META=== line at all');
     expect(prompt).toContain('NODE EXPLANATION:\nAbout [[Convolutional Neural Network|CNNs]].');
     expect(prompt).toContain('EARLIER QUESTIONS ON THIS NODE:\nQ: q3\nA: a3\nQ: q4\nA: a4\nQ: q5\nA: a5');
     expect(prompt).not.toContain('Q: q1');

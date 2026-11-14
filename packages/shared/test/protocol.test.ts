@@ -103,8 +103,35 @@ describe('real provider fixtures', () => {
 });
 
 describe('parseAskOutput', () => {
-  it('drops a stray metadata tail', () => {
-    expect(parseAskOutput('Answer [[X]]\n===META===\n{}')).toBe('Answer [[X]]');
+  const kinds = '{"children":[{"title":"Same Padding","summary":"Keeps the size."},{"title":"[[Valid Padding]]","summary":"No zeros."},{"title":"Padding","summary":"self"},{"title":"same padding","summary":"dup"}]}';
+
+  it('returns the text and the concepts the answer introduced', () => {
+    const r = parseAskOutput(`Kinds: [[Same Padding]] and [[Valid Padding]].\n\n===META===\n${kinds}`, 'Padding', []);
+    expect(r.text).toBe('Kinds: [[Same Padding]] and [[Valid Padding]].');
+    expect(r.children).toEqual([
+      { title: 'Same Padding', summary: 'Keeps the size.' },
+      { title: 'Valid Padding', summary: 'No zeros.' },
+    ]); // brackets removed, the node itself and the duplicate dropped
+  });
+
+  it('an answer with no metadata adds no nodes, and its links stay as they are', () => {
+    const r = parseAskOutput('Answer [[X]]', 'Padding');
+    expect(r).toEqual({ text: 'Answer [[X]]', children: [] });
+  });
+
+  it('invalid metadata adds no nodes and is not an error', () => {
+    expect(parseAskOutput('Answer\n===META===\n{not json', 'P').children).toEqual([]);
+    expect(parseAskOutput('Answer\n===META===\n{}', 'P').children).toEqual([]);
+  });
+
+  it('accepts fenced JSON, skips aliases of the node, and caps at five', () => {
+    const many = JSON.stringify({ children: [...'ABCDEFGH'].map((c) => ({ title: `Kind ${c}`, summary: '' })).concat([{ title: 'CNN', summary: '' }]) });
+    const r = parseAskOutput(`A\n===META===\n\`\`\`json\n${many}\n\`\`\``, 'Convolutional Neural Network', ['CNN']);
+    expect(r.children.map((c) => c.title)).toEqual(['Kind A', 'Kind B', 'Kind C', 'Kind D', 'Kind E']);
+  });
+
+  it('drops a stray metadata tail from the text', () => {
+    expect(parseAskOutput('Answer [[X]]\n===META===\n{}').text).toBe('Answer [[X]]');
   });
   it('throws when empty', () => {
     expect(() => parseAskOutput('  ')).toThrow(EmptyOutputError);
