@@ -73,6 +73,8 @@ interface Store {
   select(id: string): void;
   back(): void;
   forwardNav(): void;
+  /** Forget the journey so far, keeping only the card you are on. Does not change the map. */
+  clearTrail(): void;
   goToAnchor(): void;
   setAnchor(id: string): void;
   saveViewport(v: { x: number; y: number; zoom: number }): void;
@@ -333,6 +335,13 @@ export const useStore = create<Store>()((set, get) => {
       const trail = [...m.view.trail, next].slice(-LIMITS.trailMax);
       set({ map: { ...m, view: { ...m.view, selectedId: next, trail } }, forward: f.slice(0, -1) });
       patchView({ selectedId: next, trail });
+    },
+    clearTrail() {
+      const m = get().map;
+      if (!m || !m.view.selectedId) return;
+      const trail = [m.view.selectedId];
+      set({ map: { ...m, view: { ...m.view, trail } }, forward: [] });
+      patchView({ trail });
     },
     goToAnchor() {
       const m = get().map;

@@ -579,6 +579,46 @@ test('spotlight: other branches fade, the current path and its neighbours stay c
   await expect(node(page, 'Spot Part B Part A')).toHaveClass(/dim/);
 });
 
+test('trail: a journey tree you can fold, search and clear, with counts, the anchor and where you are', async ({ page }) => {
+  await create(page, 'Journey');
+  await written(page);
+  for (const t of ['Journey Part A', 'Journey Part B']) {
+    await node(page, t).click();
+    await panel(page).getByRole('button', { name: 'Explain' }).click();
+    await written(page);
+  }
+  await node(page, 'Journey Part A').click(); // visit A a second time
+  const trail = page.getByRole('navigation', { name: 'Trail' });
+  const entry = (title: string) => trail.getByRole('button', { name: new RegExp(`^${title}( anchor| you are here| ×\\d+)*$`) });
+
+  // each card once, the one you are on marked, the anchor marked, repeat visits counted
+  await expect(entry('Journey Part A')).toHaveAttribute('aria-current', 'step');
+  await expect(trail.getByRole('button', { name: /^Journey anchor/ })).toBeVisible();
+  await expect(trail.getByText('×2')).toHaveCount(1); // Part A twice; the others once or more are counted only when repeated
+  await expect(trail.getByRole('button', { name: /^Journey Part A/ })).toHaveCount(1);
+
+  // fold and unfold the root
+  await trail.getByRole('button', { name: 'Fold Journey' }).click();
+  await expect(entry('Journey Part B')).toHaveCount(0);
+  await trail.getByRole('button', { name: 'Unfold Journey' }).click();
+  await expect(entry('Journey Part B')).toBeVisible();
+
+  // search keeps the matches and what is above them
+  await trail.getByRole('textbox', { name: 'Search trail' }).fill('part b');
+  await expect(entry('Journey Part B')).toBeVisible();
+  await expect(entry('Journey Part A')).toHaveCount(0);
+  await trail.getByRole('textbox', { name: 'Search trail' }).fill('zzz');
+  await expect(trail.getByText(/Nothing in your trail matches/)).toBeVisible();
+  await trail.getByRole('textbox', { name: 'Search trail' }).fill('');
+
+  // clicking a card in the trail goes there; Clear keeps only where you are
+  await entry('Journey Part B').click();
+  await expect(panel(page).getByRole('heading', { name: 'Journey Part B' })).toBeVisible();
+  await trail.getByRole('button', { name: 'Clear' }).click();
+  await expect(trail.getByRole('button', { name: /^Journey/ })).toHaveCount(1);
+  await expect(entry('Journey Part B')).toHaveAttribute('aria-current', 'step');
+});
+
 test('theme toggle: light, dark, system; remembered; the board follows', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('/');

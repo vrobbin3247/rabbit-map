@@ -76,7 +76,7 @@ MINDMAPPER_DATA_DIR=~/Documents/mindmapper-data npm run dev
 - **Board (left):** the map. Pan by dragging the background, zoom with the wheel or the `−` `+` buttons.
 - **Panel (right):** the selected card. Drag its left edge to resize it.
 - **Tools (floating, far left of the board):** fit the whole map, centre on the selected card, tidy up the layout, show all cross-links, show a minimap.
-- **Trail (column left of the board):** the cards you visited, in order. Collapse it with `«`.
+- **Trail (column left of the board):** where you have been, as a tree. Each card appears once under the card you came from, with `×2` when you visited it more than once, a pin on the card you are on and an anchor icon on the anchor. Fold a branch with its arrow, filter with **Search trail…**, or press **Clear** to start the trail again from where you are. Collapse the column with `«`.
 
 On a narrow window (under about 860 px) the panel moves below the board and the trail collapses to give the board room.
 
@@ -110,7 +110,7 @@ If the same concept is already on the board, Mindmapper links to the existing ca
 Learning gets deep fast, so four tools are always on screen:
 
 - **Breadcrumb**: where this card sits in the subject, from the root down. Click any part to jump there.
-- **Trail**: the cards you visited, in order. Click one to return to it.
+- **Trail**: the cards you visited, as a tree. Click one to return to it.
 - **Back and Forward** (`Alt+←` and `Alt+→`): step through the trail like a browser.
 - **Anchor**: the card you consider "home". It starts as the root. Press **Set anchor here** on any card, and the **⚓** button in the top bar (or the `A` key) brings you straight back. The **depth** counter turns amber at depth 5, a hint that you are well down a rabbit hole.
 

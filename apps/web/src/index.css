@@ -172,6 +172,29 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 .kbd { border: 1.5px solid var(--ink-soft); border-bottom-width: 2.5px; border-radius: 5px; padding: 0 5px; font-size: 12px; color: var(--muted); }
 
 .sheet { border: 2px solid var(--ink); border-radius: var(--wob-lg); background: var(--panel); box-shadow: var(--shadow); }
+/* The trail is a tree of where you have been. Elbow connectors are drawn with borders on pseudo-elements and wobbled by the small sketch filter:
+   solid for a card under its real parent, dotted where levels were skipped. */
+.tt-list { list-style: none; margin: 0; padding: 0 0 0 14px; }
+.tt-list.root { padding-left: 2px; }
+.tt-item { position: relative; margin: 0; padding-left: 0; }
+.tt-list:not(.root) > .tt-item::before { content: ''; position: absolute; left: -9px; top: 0; width: 12px; height: 15px; border-left: 2px solid var(--ink-soft); border-bottom: 2px solid var(--ink-soft); border-bottom-left-radius: 8px; filter: url(#rough-s); pointer-events: none; }
+.tt-list:not(.root) > .tt-item:not(.last)::after { content: ''; position: absolute; left: -9px; top: 15px; bottom: 0; border-left: 2px solid var(--ink-soft); filter: url(#rough-s); pointer-events: none; }
+.tt-item.jump::before, .tt-item.jump:not(.last)::after { border-style: dotted; }
+.tt-row { display: flex; align-items: center; gap: 2px; min-height: 30px; }
+.tt-caret { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 22px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 6px; padding: 0; }
+button.tt-caret:hover:not(:disabled) { background: var(--sunken); color: var(--text); }
+button.tt-caret:disabled { cursor: default; opacity: 0.6; }
+.tt-title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 1px 8px; border: 0; background: none; text-align: left; font-size: 15px; cursor: pointer; border-radius: 4px 9px 5px 10px / 9px 5px 10px 4px; }
+.tt-title:hover { background: var(--sunken); }
+/* where you are: the marker swipe */
+.tt-title.now { background: var(--marker-b); }
+.tt-badge { flex: none; display: inline-flex; color: var(--muted); }
+.tt-badge.pin { margin-left: auto; color: var(--ink); }
+.tt-count { flex: none; margin-left: auto; font-size: 12px; color: var(--muted); }
+.tt-title.now .tt-count { margin-left: 0; }
+.tt-search { display: flex; align-items: center; gap: 8px; margin: 8px 12px 6px; padding: 3px 10px; color: var(--muted); border: 2px dashed var(--ink-soft); border-radius: var(--wob); }
+.tt-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-family: var(--font-hand); font-size: 15px; color: var(--text); }
+.tt-search:focus-within { border-style: solid; border-color: var(--ink); color: var(--text); }
 .topbar { background: var(--panel); border-bottom: 2.5px solid var(--ink); }
 .search-slot { position: relative; flex: none; width: 46px; height: 40px; }
 .searchbar { position: absolute; right: 0; top: 0; display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 46px; height: 40px; padding: 0 12px; overflow: hidden; white-space: nowrap; font-size: 17px; border: 2px solid var(--ink); border-radius: var(--wob); background: var(--bg); cursor: pointer; transition: width 0.18s ease, background 0.12s; z-index: 5; }
@@ -295,3 +318,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 .react-flow__edge.cross .react-flow__edge-path { stroke: var(--muted); stroke-dasharray: 7 6; stroke-width: 1.8; }
 .react-flow__minimap { background: var(--panel); border: 2px solid var(--ink); border-radius: var(--wob-lg); overflow: hidden; box-shadow: var(--shadow); margin: 12px; }
 .react-flow__minimap-mask { fill: rgba(91, 79, 224, 0.12); }
+
+/* The trail search box shows its own focus state (solid ink border), so the input inside must not add the global dashed outline.
+   This sits outside the components layer on purpose: unlayered rules such as the global :focus-visible win over layered ones. */
+.tt-search input:focus-visible { outline: none; }

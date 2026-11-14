@@ -40,6 +40,17 @@ describe('navigation', () => {
     expect(st().map!.view.trail).toEqual(['r', 'c', 't']);
   });
 
+  it('clearTrail keeps only the card you are on, drops forward history and does not touch the map', () => {
+    st().select('c');
+    st().select('ch');
+    st().back();
+    st().clearTrail();
+    expect(st().map!.view.trail).toEqual(['c']);
+    expect(st().map!.view.selectedId).toBe('c');
+    expect(st().forward).toEqual([]);
+    expect(Object.keys(st().map!.nodes).sort()).toEqual(['c', 'ch', 'r', 't']);
+  });
+
   it('anchor: set, go back to it', () => {
     st().select('c');
     st().setAnchor('c');
