@@ -1,0 +1,36 @@
+{
+  "name": "mindmapper",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,green \"npm run dev -w @mindmapper/server\" \"npm run dev -w @mindmapper/web\"",
+    "build": "npm run build -w @mindmapper/web",
+    "start": "npm run start -w @mindmapper/server",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "smoke": "tsx scripts/smoke.ts",
+    "test:e2e": "npm run build && playwright test",
+    "test:real": "npm run build && playwright test -c playwright.real.config.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^26.6.6",
+    "concurrently": "^10.0.7",
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
+  }
+}
