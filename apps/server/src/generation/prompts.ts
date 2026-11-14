@@ -36,7 +36,9 @@ const ASK_FORMAT = `Output format, exactly:
 1. The answer in Markdown, at most 250 words. Wrap in [[double brackets]] every distinct concept, type, kind or step that you name and that a learner could study on its own, even when you also write it in bold. For example: [[Same Padding|same padding]].
 2. Only if you named such concepts: a line containing only ===META=== and then one JSON object, with no code fence and nothing after it:
 {"children": [{"title": "<concept name>", "summary": "<one sentence, at most 25 words>"}]}
-children: up to 5 of those concepts, most important first. A title must make sense on its own, for example "Same Padding" rather than "Same". Leave out anything the node itself or one of its ancestors already covers.
+children: up to 5 of those concepts, most important first. A title must make sense on its own, for example "Same Padding" rather than "Same". Leave out anything one of the node's ancestors already covers, and anything the node merely mentions in passing.
+The app turns every entry in children into a new card on the learner's map. Bold is not a link: a concept in bold must also be in [[double brackets]].
+If the learner asks you to make, add or create nodes or cards for some concepts, put exactly those concepts in children (even if this node already covers them), write one or two sentences saying which cards you added, and never say that you cannot create nodes.
 If you named no such concepts, write no ===META=== line at all.`;
 
 export function buildSystem(level: Level, kind: PromptKind): string {

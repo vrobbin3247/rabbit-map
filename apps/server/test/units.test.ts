@@ -84,6 +84,9 @@ describe('context', () => {
     expect(system).toContain('up to 5');
     expect(system).not.toContain('"aliases"');
     expect(system).toContain('write no ===META=== line at all');
+    // the model must know that children become cards, or it refuses "make nodes for them"
+    expect(system).toContain('turns every entry in children into a new card');
+    expect(system).toContain('never say that you cannot create nodes');
     expect(prompt).toContain('NODE EXPLANATION:\nAbout [[Convolutional Neural Network|CNNs]].');
     expect(prompt).toContain('EARLIER QUESTIONS ON THIS NODE:\nQ: q3\nA: a3\nQ: q4\nA: a4\nQ: q5\nA: a5');
     expect(prompt).not.toContain('Q: q1');
