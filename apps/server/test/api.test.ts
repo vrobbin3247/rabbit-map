@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import type { ConceptNode, MapFile } from '@mindmapper/shared';
+import { buildIndex, type ConceptNode, type MapFile } from '@mindmapper/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MapStore } from '../src/store/mapStore';
 import { expectValid, makeEnv, names, until } from './helpers';
@@ -484,6 +484,86 @@ describe('positions', () => {
     for (const n of Object.values(doc.nodes)) delete (n as { position?: unknown }).position;
     writeFileSync(path.join(env.config.mapsDir, `${map.id}.json`), JSON.stringify(doc));
     expect((await new MapStore(env.config.mapsDir).get(map.id)).rootId).toBe(map.rootId);
+  });
+});
+
+describe('card colour', () => {
+  it('sets, clears, persists, and rejects bad values', async () => {
+    const map = await newMap('Topic');
+    const set = await env.json('PATCH', `/api/maps/${map.id}/nodes/${map.rootId}`, { color: 3 });
+    expect(set.status).toBe(200);
+    expect(set.body.node.color).toBe(3);
+    await env.store.flush();
+    expect((await new MapStore(env.config.mapsDir).get(map.id)).nodes[map.rootId]?.color).toBe(3);
+    expect((await env.json('PATCH', `/api/maps/${map.id}/nodes/${map.rootId}`, { color: null })).body.node.color).toBeNull();
+    for (const bad of [6, -1, 1.5, 'pink']) {
+      expect((await env.json('PATCH', `/api/maps/${map.id}/nodes/${map.rootId}`, { color: bad })).status).toBe(400);
+    }
+    expectValid(await getMap(map.id));
+  });
+
+  it('is kept by undo of a delete', async () => {
+    const map = await newMap('Topic');
+    await env.stream(`/api/maps/${map.id}/nodes/${map.rootId}/expand`);
+    const a = byTitle(await getMap(map.id), 'Topic Part A');
+    await env.json('PATCH', `/api/maps/${map.id}/nodes/${a.id}`, { color: 5 });
+    const d = await env.json('DELETE', `/api/maps/${map.id}/nodes/${a.id}`);
+    await env.json('POST', `/api/maps/${map.id}/undo`, { undoId: d.body.undo.id });
+    expect((await getMap(map.id)).nodes[a.id]?.color).toBe(5);
+  });
+});
+
+describe('add the rest (concepts mentioned but without a card)', () => {
+  async function withManyMentions() {
+    const map = await newMap('Topic');
+    await env.stream(`/api/maps/${map.id}/nodes/${map.rootId}/expand`);
+    const a = byTitle(await getMap(map.id), 'Topic Part A');
+    await env.stream(`/api/maps/${map.id}/nodes/${a.id}/ask`, { question: 'what kinds? __many__' });
+    return { map, a };
+  }
+
+  it('an answer naming eight concepts adds five, and the rest (and its other mention) can be added in one step', async () => {
+    const { map, a } = await withManyMentions();
+    let m = await getMap(map.id);
+    const kinds = Object.values(m.nodes).filter((n) => n.title.startsWith('Topic Part A Kind'));
+    expect(kinds.map((n) => n.title).sort()).toEqual(['Topic Part A Kind Five', 'Topic Part A Kind Four', 'Topic Part A Kind One', 'Topic Part A Kind Three', 'Topic Part A Kind Two']);
+    // the fake answer also links "<node> Detail", so four concepts are mentioned without a card
+    expect(buildIndex(m).ghostTargets.get(a.id)).toEqual(['Topic Part A Detail', 'Topic Part A Kind Six', 'Topic Part A Kind Seven', 'Topic Part A Kind Eight']);
+
+    const r = await env.json('POST', `/api/maps/${map.id}/nodes/${a.id}/adopt`, {});
+    expect(r.status).toBe(200);
+    expect(r.body.created).toBe(4);
+    expect(names(r.body.nodes)).toEqual(['Topic Part A', 'Topic Part A Detail', 'Topic Part A Kind Six', 'Topic Part A Kind Seven', 'Topic Part A Kind Eight']);
+    m = await getMap(map.id);
+    for (const t of ['Six', 'Seven', 'Eight']) {
+      const n = byTitle(m, `Topic Part A Kind ${t}`);
+      expect(n).toMatchObject({ parentId: a.id, status: 'stub' });
+      expect(n.origin?.snippet).toContain('Kinds:'); // remembers where it was mentioned
+    }
+    expect(buildIndex(m).ghostTargets.get(a.id)).toEqual([]); // every link in the answer now resolves
+    expectValid(m);
+
+    // adding again does nothing
+    const again = await env.json('POST', `/api/maps/${map.id}/nodes/${a.id}/adopt`, {});
+    expect(again.body.created).toBe(0);
+    expect(Object.keys((await getMap(map.id)).nodes).length).toBe(Object.keys(m.nodes).length);
+  });
+
+  it('can add just some, and ignores names that are not mentioned', async () => {
+    const { map, a } = await withManyMentions();
+    const r = await env.json('POST', `/api/maps/${map.id}/nodes/${a.id}/adopt`, { terms: ['topic part a kind seven', 'Something Never Mentioned'] });
+    expect(r.body.created).toBe(1);
+    const m = await getMap(map.id);
+    expect(byTitle(m, 'Topic Part A Kind Seven').parentId).toBe(a.id);
+    expect(Object.values(m.nodes).some((n) => n.title === 'Something Never Mentioned')).toBe(false);
+    expect(buildIndex(m).ghostTargets.get(a.id)).toEqual(['Topic Part A Detail', 'Topic Part A Kind Six', 'Topic Part A Kind Eight']);
+  });
+
+  it('rejects unknown cards and malformed bodies', async () => {
+    const { map } = await withManyMentions();
+    expect((await env.json('POST', `/api/maps/${map.id}/nodes/01ARZ3NDEKTSV4RRFFQ69G5FAV/adopt`, {})).status).toBe(404);
+    expect((await env.json('POST', `/api/maps/${map.id}/nodes/${map.rootId}/adopt`, { terms: 'x' })).status).toBe(400);
+    expect((await env.json('POST', `/api/maps/${map.id}/nodes/${map.rootId}/adopt`, { terms: ['x'], more: 1 })).status).toBe(400);
   });
 });
 

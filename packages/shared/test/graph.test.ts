@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertInvariants, buildIndex, depthOf, isAncestor, pathOf, resolve, subtreeOf } from '../src/graph';
+import { assertInvariants, buildIndex, depthOf, isAncestor, pathOf, progress, resolve, subtreeOf, unopened } from '../src/graph';
 import type { ConceptNode, MapFile } from '../src/types';
 
 let n = 0;
@@ -87,5 +87,42 @@ describe('graph', () => {
 
   it('sample map satisfies invariants', () => {
     expect(assertInvariants(map)).toEqual([]);
+  });
+});
+
+describe('unopened and progress', () => {
+  function bigger(): MapFile {
+    const m = sampleMap(); // r, c, ch and o are all explained
+    m.nodes.s1 = mkNode({ id: 's1', title: 'Stub One', parentId: 'r', summary: 'first' });
+    m.nodes.s2 = mkNode({ id: 's2', title: 'Stub Two', parentId: 'c', status: 'error', error: { code: 'rate_limited', message: 'x' } });
+    m.nodes.g = mkNode({ id: 'g', title: 'Busy', parentId: 'o', status: 'generating' });
+    return m;
+  }
+
+  it('lists stubs and failed cards, not explained or being-written ones, grouped by parent, shallow first', () => {
+    const m = bigger();
+    const groups = unopened(m, buildIndex(m));
+    expect(groups.map((g) => [g.parentTitle, g.items.map((i) => i.title)])).toEqual([
+      ['Deep learning', ['Stub One']],
+      ['Convolutional Neural Network', ['Stub Two']],
+    ]);
+    expect(groups[1]!.items.map((i) => i.status)).toEqual(['error']);
+    expect(groups[0]!.items[0]).toMatchObject({ summary: 'first', depth: 1 });
+  });
+
+  it('can be limited to one branch, without the branch root itself', () => {
+    const m = bigger();
+    const idx = buildIndex(m);
+    expect(unopened(m, idx, 'c').flatMap((g) => g.items.map((i) => i.title))).toEqual(['Stub Two']);
+    expect(unopened(m, idx, 's1')).toEqual([]); // a card's own branch does not include itself
+    expect(unopened(m, idx, 'o')).toEqual([]);
+  });
+
+  it('counts progress', () => {
+    const m = bigger();
+    expect(progress(m)).toEqual({ total: 7, explained: 4, left: 2 });
+    for (const n of Object.values(m.nodes)) if (n.status !== 'generating') n.status = 'ready';
+    expect(progress(m)).toMatchObject({ left: 0 });
+    expect(unopened(m, buildIndex(m))).toEqual([]);
   });
 });

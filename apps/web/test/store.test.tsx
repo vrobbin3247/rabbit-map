@@ -180,6 +180,53 @@ describe('moving nodes', () => {
   });
 });
 
+describe('card colour', () => {
+  it('shows the colour at once, then keeps what the server says', async () => {
+    let release!: (r: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((res) => (release = res))));
+    const p = st().setColor('c', 3);
+    expect(st().map!.nodes.c!.color).toBe(3); // before the server has answered
+    release(jsonResponse({ node: { ...st().map!.nodes.c!, color: 3 } }));
+    await p;
+    expect(st().map!.nodes.c!.color).toBe(3);
+  });
+
+  it('goes back to the old colour when saving fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: { code: 'storage_failed', message: 'disk full' } }, 500)));
+    await st().setColor('c', 2);
+    expect(st().map!.nodes.c!.color ?? null).toBeNull();
+    expect(st().banner?.text).toBe('disk full');
+  });
+
+  it('null returns the card to its depth colour', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ node: { ...st().map!.nodes.c!, color: null } })));
+    st().map!.nodes.c!.color = 4;
+    await st().setColor('c', null);
+    expect(st().map!.nodes.c!.color).toBeNull();
+  });
+});
+
+describe('add the rest', () => {
+  it('adds the cards the server created and says how many', async () => {
+    const created = { ...sampleMap().nodes.t!, id: 'n1', title: 'Mentioned One', parentId: 'c', status: 'stub' as const };
+    const f = vi.fn(async () => jsonResponse({ created: 1, nodes: [useStore.getState().map!.nodes.c!, created] }));
+    vi.stubGlobal('fetch', f);
+    await st().adoptGhosts('c');
+    expect(st().map!.nodes.n1?.title).toBe('Mentioned One');
+    expect(st().index!.children.get('c')).toContain('n1');
+    expect(st().banner?.text).toBe('Added 1 card.');
+    expect(JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({});
+  });
+
+  it('can be limited to some concepts, and reports when there was nothing to add', async () => {
+    const f = vi.fn(async () => jsonResponse({ created: 0, nodes: [] }));
+    vi.stubGlobal('fetch', f);
+    await st().adoptGhosts('c', ['Only This']);
+    expect(JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ terms: ['Only This'] });
+    expect(st().banner?.text).toBe('Nothing to add.');
+  });
+});
+
 describe('undo', () => {
   const deleted = (id: string, label: string) =>
     jsonResponse({ removedIds: [id], nodes: [], view: { selectedId: 'r', anchorId: 'r', trail: ['r'], viewport: null }, undo: { id: 'U1', label } });

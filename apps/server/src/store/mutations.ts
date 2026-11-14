@@ -3,6 +3,7 @@ import {
   buildIndex,
   extractWikilinks,
   isAncestor,
+  linkableTexts,
   pathOf,
   resolve,
   stripWikilinks,
@@ -302,6 +303,33 @@ export function openConcept(
   });
   map.nodes[id] = created;
   return { node: created, created: true };
+}
+
+/** The most cards "Add the rest" creates at once, so one click cannot flood the map. */
+export const ADOPT_MAX = 30;
+
+/**
+ * Create stubs under `nodeId` for the concepts its text links to but that have no card yet (its
+ * "ghost links"). No model call. `terms` limits it to some of them. Returns the ids created.
+ */
+export function adoptGhosts(map: MapFile, nodeId: string, terms?: string[]): string[] {
+  const n = node(map, nodeId);
+  const index = buildIndex(map);
+  const wanted = terms ? new Set(terms.map(toSlug)) : null;
+  const text = linkableTexts(n).join('\n\n');
+  const created: string[] = [];
+  for (const ghost of index.ghostTargets.get(nodeId) ?? []) {
+    if (created.length >= ADOPT_MAX) break;
+    const title = squash(ghost);
+    const slug = toSlug(title);
+    if (!slug || title.length > LIMITS.titleMax || slug === toSlug(n.title) || (wanted && !wanted.has(slug))) continue;
+    if (index.slugToId.has(slug)) continue;
+    const id = newId();
+    map.nodes[id] = blankNode(id, title, nodeId, { origin: { nodeId, snippet: snippetFor(text, slug) } });
+    index.slugToId.set(slug, id);
+    created.push(id);
+  }
+  return created;
 }
 
 export function renameNode(map: MapFile, nodeId: string, rawTitle: string): void {

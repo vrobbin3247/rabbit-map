@@ -30,7 +30,7 @@ export function ConceptNodeView({ data }: NodeProps<ConceptFlowNode>) {
   const cls = ['cnode', node.status, selected && 'selected', onPath && 'on-path', !visited && 'unvisited'].filter(Boolean).join(' ');
   const label = [node.title, node.status === 'stub' ? 'not explained yet' : node.status, node.summary].filter(Boolean).join('. ');
   return (
-    <div className={cls} data-tone={depth % TONES} role="button" aria-label={label} aria-pressed={selected} title={node.title}>
+    <div className={cls} data-tone={node.color ?? depth % TONES} role="button" aria-label={label} aria-pressed={selected} title={node.title}>
       <Handle type="target" position={Position.Left} className="hdl" isConnectable={false} />
       <div className="badge">
         {anchor && <span className="anchor" title="Anchor">⚓</span>}

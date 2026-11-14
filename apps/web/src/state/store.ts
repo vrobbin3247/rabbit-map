@@ -33,7 +33,7 @@ export interface Banner {
   action?: { label: string; run: () => void };
 }
 
-export type NodeDialog = { kind: 'rename' | 'merge' | 'delete' | 'addChild'; id: string };
+export type NodeDialog = { kind: 'rename' | 'merge' | 'delete' | 'addChild' | 'colour'; id: string };
 export interface CtxMenu {
   x: number;
   y: number;
@@ -58,6 +58,7 @@ interface Store {
   nodeDialog: NodeDialog | null;
   /** The last delete or merge, which can be undone. */
   undo: { id: string; label: string } | null;
+  leftOpen: boolean;
 
   init(): Promise<void>;
   loadHealth(refresh?: boolean): Promise<void>;
@@ -86,6 +87,10 @@ interface Store {
   deleteNode(id: string): Promise<void>;
   mergeNode(id: string, intoId: string): Promise<boolean>;
   toggleCollapse(id: string): Promise<void>;
+  /** Add cards for the concepts a card mentions but has no card for. No model call. */
+  adoptGhosts(id: string, terms?: string[]): Promise<void>;
+  /** Give a card a colour (0 to 5), or null to follow depth again. */
+  setColor(id: string, color: number | null): Promise<void>;
   undoLast(): Promise<void>;
   /** Pin nodes at positions, or release them with null. */
   moveNodes(positions: Record<string, { x: number; y: number } | null>): Promise<void>;
@@ -94,7 +99,7 @@ interface Store {
   deleteMessage(nodeId: string, messageId: string): Promise<void>;
 
   setBanner(b: Banner | null): void;
-  set(p: Partial<Pick<Store, 'showAllCrossLinks' | 'trailOpen' | 'searchOpen' | 'askQuote' | 'ctxMenu' | 'nodeDialog'>>): void;
+  set(p: Partial<Pick<Store, 'showAllCrossLinks' | 'trailOpen' | 'searchOpen' | 'askQuote' | 'ctxMenu' | 'nodeDialog' | 'leftOpen'>>): void;
   focusAsk(): void;
 }
 
@@ -229,6 +234,7 @@ export const useStore = create<Store>()((set, get) => {
     ctxMenu: null,
     nodeDialog: null,
     undo: null,
+    leftOpen: false,
 
     async init() {
       await Promise.all([get().loadHealth(), get().loadMaps()]);
@@ -454,6 +460,29 @@ export const useStore = create<Store>()((set, get) => {
       } catch (e) {
         fail(e);
         await refreshMap();
+      }
+    },
+    async setColor(id, color) {
+      const m = get().map;
+      const n = m?.nodes[id];
+      if (!m || !n) return;
+      applyNodes([{ ...n, color }]); // at once; the server confirms below
+      try {
+        applyNodes([(await api.patchNode(m.id, id, { color })).node]);
+      } catch (e) {
+        fail(e);
+        applyNodes([n]);
+      }
+    },
+    async adoptGhosts(id, terms) {
+      const m = get().map;
+      if (!m) return;
+      try {
+        const r = await api.adopt(m.id, id, terms);
+        applyNodes(r.nodes);
+        set({ banner: { kind: 'info', text: r.created ? `Added ${r.created} card${r.created === 1 ? '' : 's'}.` : 'Nothing to add.' } });
+      } catch (e) {
+        fail(e);
       }
     },
     async undoLast() {

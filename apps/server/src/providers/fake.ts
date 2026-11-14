@@ -68,6 +68,12 @@ export class FakeProvider implements Provider {
     if (question !== null) {
       const n = field(prompt, 'NODE') ?? 'this node';
       const text = `Answer about **${n}**: ${question}. See [[${SHARED}]] and [[${n} Detail]].`;
+      if (trigger.includes('__many__')) {
+        // An answer that names more concepts than the five a reply may add as cards.
+        const kinds = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight'].map((k) => `${n} Kind ${k}`);
+        const meta = { children: kinds.slice(0, 5).map((title) => ({ title, summary: `About ${title}.` })) };
+        return `${text} Kinds: ${kinds.map((k) => `[[${k}]]`).join(', ')}.\n\n===META===\n${JSON.stringify(meta)}`;
+      }
       if (!trigger.includes('__children__')) return text;
       // Like a real answer that names kinds of the concept: link them and suggest them as nodes.
       const kids = [

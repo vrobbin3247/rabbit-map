@@ -247,6 +247,105 @@ test('responsive: side by side when wide, panel below the board when narrow', as
   await page.screenshot({ path: 'test-results/narrow.png' });
 });
 
+test('card colour: choose one, it shows on the board, survives a reload, and can go back to automatic', async ({ page }) => {
+  await create(page, 'Paint');
+  await written(page);
+  const tone = (t: string) => node(page, t).getAttribute('data-tone');
+  expect(await tone('Paint Part A')).toBe('1'); // depth 1 is blue by default
+
+  await node(page, 'Paint Part A').click({ button: 'right' });
+  await item(page, 'Colour…').click();
+  const dialog = page.getByRole('dialog', { name: /^Colour for/ });
+  await expect(dialog.getByRole('button', { name: 'Automatic (by depth)' })).toBeDisabled(); // nothing chosen yet
+  await dialog.getByRole('button', { name: 'Pink' }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await tone('Paint Part A')).toBe('3');
+  expect(await tone('Paint Part B')).toBe('1'); // others unchanged
+  expect(await tone('Paint')).toBe('0');
+
+  // the colour is really applied, and differs from the depth colour
+  const fill = (t: string) => node(page, t).evaluate((el) => getComputedStyle(el).borderColor);
+  expect(await fill('Paint Part A')).not.toBe(await fill('Paint Part B'));
+
+  // it survives a reload
+  await page.waitForTimeout(900);
+  await page.reload();
+  await page.getByRole('button', { name: /Paint/ }).first().click();
+  expect(await tone('Paint Part A')).toBe('3');
+
+  // back to automatic
+  await node(page, 'Paint Part A').click({ button: 'right' });
+  await item(page, 'Colour…').click();
+  await expect(dialog.getByRole('button', { name: 'Pink' })).toHaveAttribute('aria-pressed', 'true');
+  await dialog.getByRole('button', { name: 'Automatic (by depth)' }).click();
+  expect(await tone('Paint Part A')).toBe('1');
+});
+
+test('Add all: concepts an answer mentions beyond the five it added become cards in one click', async ({ page }) => {
+  await create(page, 'Rest');
+  await written(page);
+  await node(page, 'Rest Part A').click();
+  const ask = panel(page).getByPlaceholder('Ask about Rest Part A…');
+  await ask.fill('what are the kinds? __many__');
+  await ask.press('Enter');
+  await expect(panel(page).getByText(/Answer about/)).toBeVisible();
+
+  // five became cards; four more concepts are mentioned (three kinds and a "Detail") but have no card
+  await expect(node(page, 'Rest Part A Kind Five')).toBeVisible();
+  await expect(node(page, 'Rest Part A Kind Six')).toHaveCount(0);
+  const section = panel(page).getByRole('region', { name: 'Mentioned but not added' });
+  await expect(section.getByRole('button', { name: 'Rest Part A Kind Six' })).toBeVisible();
+  await expect(section.getByRole('button', { name: 'Rest Part A Kind Eight' })).toBeVisible();
+  await section.getByRole('button', { name: 'Add all 4' }).click();
+
+  await expect(page.getByText('Added 4 cards.')).toBeVisible();
+  for (const k of ['Six', 'Seven', 'Eight']) await expect(node(page, `Rest Part A Kind ${k}`)).toBeVisible();
+  await expect(node(page, 'Rest Part A Detail')).toBeVisible();
+  await expect(section).toHaveCount(0); // nothing left to add
+  // they are stubs: nothing was written, so no model call was made
+  const nextConcepts = panel(page).locator('section', { hasText: 'Next concepts' });
+  await expect(nextConcepts.getByRole('button', { name: 'Rest Part A Kind Seven', exact: true })).toBeVisible();
+  await nextConcepts.getByRole('button', { name: 'Rest Part A Kind Seven', exact: true }).click();
+  await expect(panel(page).getByRole('button', { name: 'Explain' })).toBeVisible();
+});
+
+test("What's left: lists unopened cards, shows progress, narrows to a branch, explains from the list", async ({ page }) => {
+  await create(page, 'Left');
+  await written(page);
+  const chip = page.getByRole('button', { name: /\d+ left$/ });
+  await expect(chip).toHaveText('4 left'); // Part A, B, C and Shared Concept
+  await chip.click();
+  const dialog = page.getByRole('dialog', { name: "What's left" });
+  await expect(dialog.getByText('1 of 5 cards explained')).toBeVisible();
+  await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '20');
+  await expect(dialog.getByRole('region', { name: 'Under Left', exact: true }).getByText('Left Part A', { exact: true })).toBeVisible();
+
+  // explain one from the list; the count drops and the list updates
+  const row = dialog.getByRole('listitem').filter({ hasText: 'Left Part B' });
+  await row.getByRole('button', { name: 'Explain' }).click();
+  await expect(dialog.getByText('2 of 8 cards explained')).toBeVisible(); // it added three more cards
+  await expect(dialog.getByRole('region', { name: 'Under Left Part B' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(chip).toHaveText('6 left');
+
+  // open a card from the list: selects it and closes the dialog
+  await chip.click();
+  await dialog.getByRole('listitem').filter({ hasText: 'Left Part C' }).getByRole('button', { name: 'Open' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(panel(page).getByRole('heading', { name: 'Left Part C' })).toBeVisible();
+
+  // only under the selected branch
+  await node(page, 'Left Part B').click();
+  await chip.click();
+  await dialog.getByLabel(/Only under “Left Part B”/).check();
+  await expect(dialog.getByRole('region', { name: 'Under Left Part B' })).toBeVisible();
+  await expect(dialog.getByRole('region', { name: 'Under Left', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  await page.screenshot({ path: 'test-results/left.png' });
+});
+
 test('undo a delete and a merge from the message and from the keyboard', async ({ page }) => {
   await create(page, 'Undo');
   await written(page);

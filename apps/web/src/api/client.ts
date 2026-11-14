@@ -63,10 +63,12 @@ export const api = {
   exportMap: (id: string) => req<{ path: string; files: number }>('POST', `/maps/${id}/export`, {}),
   patchPositions: (id: string, b: { positions?: Record<string, { x: number; y: number } | null>; reset?: boolean }) =>
     req<{ nodes: ConceptNode[] }>('PATCH', `/maps/${id}/positions`, b),
+  adopt: (id: string, nodeId: string, terms?: string[]) =>
+    req<{ created: number; nodes: ConceptNode[] }>('POST', `/maps/${id}/nodes/${nodeId}/adopt`, terms ? { terms } : {}),
   undo: (id: string, undoId: string) => req<{ map: MapFile; label: string }>('POST', `/maps/${id}/undo`, { undoId }),
   openConcept: (id: string, b: { fromNodeId: string; term: string; snippet?: string }) =>
     req<{ node: ConceptNode; created: boolean }>('POST', `/maps/${id}/nodes`, b),
-  patchNode: (id: string, nodeId: string, b: { title?: string; collapsed?: boolean }) =>
+  patchNode: (id: string, nodeId: string, b: { title?: string; collapsed?: boolean; color?: number | null }) =>
     req<{ node: ConceptNode }>('PATCH', `/maps/${id}/nodes/${nodeId}`, b),
   deleteNode: (id: string, nodeId: string) => req<Changes>('DELETE', `/maps/${id}/nodes/${nodeId}`),
   mergeNode: (id: string, nodeId: string, intoId: string) =>

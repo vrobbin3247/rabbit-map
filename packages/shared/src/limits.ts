@@ -1,3 +1,6 @@
+/** Card colours, in the order of the six tones in the stylesheet. */
+export const TONE_NAMES = ['Yellow', 'Blue', 'Green', 'Pink', 'Orange', 'Purple'] as const;
+
 export const LIMITS = {
   topicMax: 200,
   titleMax: 80,

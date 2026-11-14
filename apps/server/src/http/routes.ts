@@ -1,4 +1,5 @@
 import {
+  AdoptBodySchema,
   AskBodySchema,
   CreateMapBodySchema,
   ExpandBodySchema,
@@ -19,6 +20,7 @@ import { AppError } from '../errors';
 import { prepareAsk, prepareExpand, subtreeKeys, jobKey, type Runner } from '../generation/generator';
 import { exportMap } from '../store/export';
 import {
+  adoptGhosts,
   createMap,
   deleteMessage,
   deleteNode,
@@ -142,6 +144,15 @@ export function registerRoutes(app: Hono, deps: Deps): void {
     return c.json({ node, created: r.created }, r.created ? 201 : 200);
   });
 
+  app.post('/api/maps/:mapId/nodes/:nodeId/adopt', async (c) => {
+    const mapId = id(c.req.param('mapId'));
+    const nodeId = id(c.req.param('nodeId'));
+    const body = await parseBody(c, AdoptBodySchema);
+    const created = await store.mutate(mapId, (m) => adoptGhosts(m, nodeId, body.terms));
+    const after = await store.get(mapId);
+    return c.json({ created: created.length, nodes: [nodeId, ...created].map((i) => after.nodes[i]).filter(Boolean) });
+  });
+
   app.patch('/api/maps/:mapId/nodes/:nodeId', async (c) => {
     const mapId = id(c.req.param('mapId'));
     const nodeId = id(c.req.param('nodeId'));
@@ -151,6 +162,7 @@ export function registerRoutes(app: Hono, deps: Deps): void {
       if (!n) throw new AppError('not_found', 'Node not found.');
       if (body.title) renameNode(m, nodeId, body.title);
       if (body.collapsed !== undefined) n.collapsed = body.collapsed;
+      if (body.color !== undefined) n.color = body.color;
     });
     return c.json({ node: (await store.get(mapId)).nodes[nodeId] });
   });

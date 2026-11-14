@@ -2,7 +2,7 @@ import type { MapFile } from '@mindmapper/shared';
 import { describe, expect, it } from 'vitest';
 import { PROMPT_BUDGET, buildAskPrompt, buildExpandPrompt } from '../src/generation/context';
 import { JobManager } from '../src/generation/jobs';
-import { createMap, finishExpand, openConcept, startExpand } from '../src/store/mutations';
+import { ADOPT_MAX, adoptGhosts, createMap, finishExpand, openConcept, startExpand } from '../src/store/mutations';
 import { expectValid } from './helpers';
 
 const gen = { provider: 'fake' as const, model: null, at: '', durationMs: 1, metaRecovered: false };
@@ -158,6 +158,25 @@ describe('finishExpand', () => {
     startExpand(m, m.rootId);
     finishExpand(m, m.rootId, { body: 'b', summary: '', aliases: [], children: Array.from({ length: 12 }, (_, i) => child(`Extra ${i}`)), metaRecovered: false }, gen);
     expect(Object.values(m.nodes).filter((n) => n.title.startsWith('Extra'))).toHaveLength(7);
+  });
+});
+
+describe('adoptGhosts', () => {
+  it('never creates more than the cap at once', () => {
+    const m = sample();
+    const body = Array.from({ length: 45 }, (_, i) => `[[Mentioned ${i}]]`).join(' ');
+    m.nodes[m.rootId]!.body = body;
+    expect(adoptGhosts(m, m.rootId)).toHaveLength(ADOPT_MAX);
+    expect(adoptGhosts(m, m.rootId)).toHaveLength(15); // the rest, on the next click
+    expect(adoptGhosts(m, m.rootId)).toHaveLength(0);
+    expectValid(m);
+  });
+
+  it('skips the card itself, existing cards and repeats', () => {
+    const m = sample();
+    m.nodes[m.rootId]!.body = 'See [[Deep learning]], [[Transformer]], [[New Idea]], [[new idea]], [[Neural Idea]].';
+    const made = adoptGhosts(m, m.rootId);
+    expect(made.map((id) => m.nodes[id]!.title)).toEqual(['New Idea', 'Neural Idea']);
   });
 });
 

@@ -137,6 +137,49 @@ export function isAncestor(map: MapFile, ancestorId: string, id: string): boolea
   return ancestorId !== id && p.includes(ancestorId);
 }
 
+export interface UnopenedItem {
+  id: string;
+  title: string;
+  summary: string;
+  status: ConceptNode['status'];
+  depth: number;
+}
+
+export interface UnopenedGroup {
+  parentId: string;
+  parentTitle: string;
+  items: UnopenedItem[];
+}
+
+/**
+ * Cards that have not been explained yet (stubs, and ones whose last attempt failed), grouped by the
+ * card they hang under. Shallow groups come first, so the broad topics are listed before the details.
+ * `underId` limits the list to one branch (the card itself is not included).
+ */
+export function unopened(map: MapFile, index: MapIndex, underId?: string): UnopenedGroup[] {
+  const inBranch = underId ? new Set(subtreeOf(map, underId)) : null;
+  const groups = new Map<string, UnopenedGroup>();
+  for (const n of Object.values(map.nodes).sort(byCreated)) {
+    if (n.status !== 'stub' && n.status !== 'error') continue;
+    if (inBranch && (!inBranch.has(n.id) || n.id === underId)) continue;
+    const parentId = n.parentId ?? n.id;
+    const parent = map.nodes[parentId] as ConceptNode;
+    const g = groups.get(parentId) ?? { parentId, parentTitle: parent.title, items: [] };
+    g.items.push({ id: n.id, title: n.title, summary: n.summary, status: n.status, depth: index.depth.get(n.id) ?? 0 });
+    groups.set(parentId, g);
+  }
+  return [...groups.values()].sort(
+    (a, b) => (index.depth.get(a.parentId) ?? 0) - (index.depth.get(b.parentId) ?? 0) || a.parentTitle.localeCompare(b.parentTitle),
+  );
+}
+
+/** How far through the map the learner is: cards explained, cards left, and the total. */
+export function progress(map: MapFile): { total: number; explained: number; left: number } {
+  const nodes = Object.values(map.nodes);
+  const left = nodes.filter((n) => n.status === 'stub' || n.status === 'error').length;
+  return { total: nodes.length, explained: nodes.filter((n) => n.status === 'ready').length, left };
+}
+
 export function assertInvariants(map: MapFile): string[] {
   const problems: string[] = [];
   const roots = Object.values(map.nodes).filter((n) => n.parentId === null);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { subtreeOf, type ConceptNode } from '@mindmapper/shared';
+import { TONE_NAMES, subtreeOf, type ConceptNode } from '@mindmapper/shared';
 import { useStore } from '../state/store';
 import { ConfirmDialog, Dialog, PromptDialog } from '../ui/Dialog';
 
@@ -29,6 +29,38 @@ function MergeDialog({ node, onClose }: { node: ConceptNode; onClose: () => void
         ))}
         {!list.length && <li className="muted">No matching node.</li>}
       </ul>
+    </Dialog>
+  );
+}
+
+function ColourDialog({ node, onClose }: { node: ConceptNode; onClose: () => void }) {
+  const depth = useStore((s) => s.index?.depth.get(node.id) ?? 0);
+  const current = node.color ?? null;
+  const pick = (c: number | null) => {
+    void useStore.getState().setColor(node.id, c);
+    onClose();
+  };
+  return (
+    <Dialog title={`Colour for “${node.title}”`} onClose={onClose}>
+      <p className="m-0 text-xs muted">By default a card's colour follows how deep it is. Pick one to set this card apart, for example to mark what you have understood.</p>
+      <div className="flex flex-wrap gap-3" role="group" aria-label="Colours">
+        {TONE_NAMES.map((name, i) => (
+          <button
+            key={name}
+            aria-label={name}
+            aria-pressed={current === i}
+            title={name}
+            onClick={() => pick(i)}
+            className="h-9 w-9 rounded-lg border-2"
+            style={{ background: `var(--tone-${i})`, borderColor: current === i ? 'var(--accent)' : `var(--tone-${i}-line)`, boxShadow: current === i ? '0 0 0 2px var(--accent)' : undefined }}
+            autoFocus={current === i || (current === null && i === depth % TONE_NAMES.length)}
+          />
+        ))}
+      </div>
+      <div className="flex justify-between gap-2">
+        <button className="btn" disabled={current === null} onClick={() => pick(null)}>Automatic (by depth)</button>
+        <button className="btn" onClick={onClose}>Cancel</button>
+      </div>
     </Dialog>
   );
 }
@@ -68,6 +100,7 @@ export function NodeDialogs() {
     );
   }
   if (dialog.kind === 'merge') return <MergeDialog node={node} onClose={close} />;
+  if (dialog.kind === 'colour') return <ColourDialog node={node} onClose={close} />;
 
   const size = subtreeOf(map, node.id).length;
   return (

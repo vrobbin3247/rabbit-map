@@ -103,6 +103,7 @@ function ContextMenuHost({ anyPinned }: { anyPinned: boolean }) {
     label = 'Board actions';
     entries = [
       { id: 'fit', label: 'Fit the whole map', run: () => void rf.fitView(fitOptions()) },
+      { id: 'left', label: 'What’s left…', run: () => st().set({ leftOpen: true }) },
       { id: 'anchor', label: 'Go to anchor', hint: 'A', disabled: map.view.selectedId === map.view.anchorId, run: () => st().goToAnchor() },
       'separator',
       { id: 'tidy', label: 'Tidy up layout', disabled: !anyPinned, run: () => void st().tidyUp() },
@@ -317,7 +318,7 @@ function Canvas() {
           zoomable
           position="bottom-right"
           nodeStrokeWidth={2}
-          nodeColor={(n) => ((n.data as { node?: ConceptNode })?.node?.status === 'stub' ? '#d6d9df' : (TONE_HEX[((n.data as { depth?: number })?.depth ?? 0) % TONES] as string))}
+          nodeColor={(n) => ((n.data as { node?: ConceptNode })?.node?.status === 'stub' ? '#d6d9df' : (TONE_HEX[(n.data as { node?: ConceptNode })?.node?.color ?? ((n.data as { depth?: number })?.depth ?? 0) % TONES] as string))}
           ariaLabel="Minimap"
         />
       )}

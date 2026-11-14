@@ -90,6 +90,7 @@ export function NodePanel() {
   const generating = node.status === 'generating' || (stream?.kind === 'expand');
   const children = (index.children.get(node.id) ?? []).map((id) => map.nodes[id]).filter((n): n is ConceptNode => !!n);
   const mentioned = [...(index.backLinks.get(node.id) ?? [])].map((id) => map.nodes[id]).filter((n): n is ConceptNode => !!n);
+  const ghosts = index.ghostTargets.get(node.id) ?? [];
   const related = node.related.map((id) => map.nodes[id]).filter((n): n is ConceptNode => !!n);
   const go = (id: string) => useStore.getState().select(id);
   const chip = (n: ConceptNode) => (
@@ -135,6 +136,23 @@ export function NodePanel() {
 
         {children.length > 0 && (
           <section className="mt-6"><h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide muted">Next concepts</h3><div className="flex flex-wrap gap-2">{children.map(chip)}</div></section>
+        )}
+        {ghosts.length > 0 && (
+          <section className="mt-5" aria-label="Mentioned but not added">
+            <h3 className="m-0 mb-2 flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide muted">
+              <span>Mentioned, no card yet</span>
+              <button className="btn btn-sm normal-case tracking-normal" onClick={() => void useStore.getState().adoptGhosts(node.id)}>
+                Add all {ghosts.length}
+              </button>
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {ghosts.map((g) => (
+                <button key={g} className="chip stub" title="Not opened yet. Click to add it and have it explained." onClick={() => void useStore.getState().openConcept(node.id, g)}>
+                  {g}
+                </button>
+              ))}
+            </div>
+          </section>
         )}
         {related.length > 0 && (
           <section className="mt-5"><h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide muted">See also</h3><div className="flex flex-wrap gap-2">{related.map(chip)}</div></section>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api/client';
+import { progress } from '@mindmapper/shared';
 import { useStore } from '../state/store';
 import { PromptDialog } from '../ui/Dialog';
 import { ThemeToggle } from '../ui/ThemeToggle';
@@ -16,6 +17,7 @@ export function TopBar() {
   const depth = sel ? (index.depth.get(sel) ?? 0) : 0;
   const anchor = map.nodes[map.view.anchorId];
   const awayFromAnchor = sel !== map.view.anchorId;
+  const left = progress(map).left;
   const provider = health?.providers.find((p) => p.id === map.settings.provider);
 
   return (
@@ -70,6 +72,13 @@ export function TopBar() {
         <button className="btn btn-sm" aria-label="Forward" title="Forward (Alt+→)" disabled={forwardCount === 0} onClick={() => st().forwardNav()}>→</button>
         <div className="min-w-0 flex-1"><Breadcrumb /></div>
         <span className={`rounded-full px-2 py-0.5 text-xs ${depth >= 5 ? 'bg-[var(--warn-soft)] text-[var(--warn)]' : 'bg-[var(--sunken)] muted'}`} title={depth >= 5 ? 'You are deep in a branch. The anchor takes you back.' : 'Levels below the root'}>depth {depth}</span>
+        <button
+          className="chip"
+          onClick={() => st().set({ leftOpen: true })}
+          title={left ? `${left} card${left === 1 ? ' has' : 's have'} not been explained yet. Click to see them.` : 'Every card has been explained.'}
+        >
+          {left ? `${left} left` : '✓ all opened'}
+        </button>
         {awayFromAnchor && sel && (
           <button className="btn btn-sm" title="Make this node the anchor" onClick={() => st().setAnchor(sel)}>Set anchor here</button>
         )}

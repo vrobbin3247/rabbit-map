@@ -3,6 +3,7 @@ import { MapCanvas } from './canvas/MapCanvas';
 import { SearchPalette } from './nav/SearchPalette';
 import { TopBar } from './nav/TopBar';
 import { Trail } from './nav/Trail';
+import { LeftDialog } from './panel/LeftDialog';
 import { NodeDialogs } from './panel/NodeDialogs';
 import { NodePanel } from './panel/NodePanel';
 import { useStore } from './state/store';
@@ -33,6 +34,7 @@ function onCanvasOrPage(t: EventTarget | null): boolean {
 
 export function MapView() {
   const searchOpen = useStore((s) => s.searchOpen);
+  const leftOpen = useStore((s) => s.leftOpen);
   const [width, setWidth] = useState(readWidth);
 
   useEffect(() => {
@@ -163,6 +165,7 @@ export function MapView() {
         </div>
       </div>
       {searchOpen && <SearchPalette />}
+      {leftOpen && <LeftDialog />}
       <NodeDialogs />
     </div>
   );

@@ -62,6 +62,8 @@ export const ConceptNodeSchema = z.object({
   collapsed: z.boolean(),
   /** Where the learner dragged this node on the board. Absent or null means automatic layout. */
   position: PositionSchema.nullable().optional(),
+  /** A colour chosen for this card (0 to 5, see TONE_NAMES). Absent or null means the colour follows depth. */
+  color: z.number().int().min(0).max(5).nullable().optional(),
   generatedBy: GenerationSchema.nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -143,6 +145,7 @@ export const PatchNodeBodySchema = z
   .object({
     title: z.string().trim().min(1).max(LIMITS.titleMax).optional(),
     collapsed: z.boolean().optional(),
+    color: z.number().int().min(0).max(5).nullable().optional(),
   })
   .strict();
 
@@ -153,6 +156,9 @@ export const PatchPositionsBodySchema = z
     reset: z.boolean().optional(),
   })
   .strict();
+
+/** Add cards for the concepts a card mentions but has no card for. `terms` limits it to some; omit for all. */
+export const AdoptBodySchema = z.object({ terms: z.array(z.string().max(80)).max(30).optional() }).strict();
 
 export const UndoBodySchema = z.object({ undoId: z.string() }).strict();
 

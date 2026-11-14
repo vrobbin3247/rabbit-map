@@ -35,7 +35,7 @@ export function nodeMenu(
   const isRoot = node.id === map.rootId;
   const firstChild = index.children.get(node.id)?.[0];
   const hasKids = (index.children.get(node.id)?.length ?? 0) > 0;
-  const dialog = (kind: 'rename' | 'merge' | 'delete' | 'addChild') => () => st().set({ nodeDialog: { kind, id: node.id } });
+  const dialog = (kind: 'rename' | 'merge' | 'delete' | 'addChild' | 'colour') => () => st().set({ nodeDialog: { kind, id: node.id } });
   const out: MenuEntry[] = [];
 
   if (state.streaming || node.status === 'generating') {
@@ -63,6 +63,7 @@ export function nodeMenu(
   if (firstChild) out.push({ id: 'child', label: 'Go to first child', hint: '→', run: () => st().select(firstChild) });
   out.push({ id: 'anchor', label: 'Set as anchor', disabled: map.view.anchorId === node.id, run: () => st().setAnchor(node.id) });
   if (node.position) out.push({ id: 'unpin', label: 'Release position', run: () => void st().unpinNode(node.id) });
+  out.push({ id: 'colour', label: 'Colour…', run: dialog('colour') });
   if (hasKids) out.push({ id: 'collapse', label: node.collapsed ? 'Expand branch' : 'Collapse branch', run: () => void st().toggleCollapse(node.id) });
   out.push('separator');
 
