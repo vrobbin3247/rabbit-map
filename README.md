@@ -18,7 +18,8 @@ Learning from an AI chat usually goes like this: you ask what deep learning is, 
 - **One card per concept.** "Channels" reached from two different branches is the same card, shown under **Mentioned in** and **See also**.
 - **Ask questions on any card.** Answers are saved on the card. If an answer names kinds or parts of something ("different types of padding"), they are added as new cards under it.
 - **Always a way back.** A breadcrumb, a trail, Back and Forward, search, and an **anchor** you can set as "where I really am".
-- **Yours to arrange.** Drag cards anywhere, collapse branches, rename, merge, delete, and export everything as Markdown notes.
+- **Know what is left.** A **N left** counter shows how many cards you have not opened yet, and a list shows them with your progress.
+- **Yours to arrange.** Drag cards anywhere, give them colours, collapse branches, rename, merge, delete (with **Undo**), and export everything as Markdown notes.
 - **Private.** The server only listens on your own machine. Maps are plain files in a folder.
 
 ## Requirements
@@ -98,8 +99,10 @@ MINDMAPPER_DATA_DIR=~/Documents/mindmapper-data npm run dev
 
 - **Board (left):** the map. Pan by dragging the background, zoom with the wheel or the `−` `+` buttons.
 - **Panel (right):** the selected card. Drag its left edge to resize it.
-- **Tools (far left):** fit the whole map, centre on the selected card, tidy up the layout, show all cross-links, show a minimap.
-- **Trail:** the cards you visited, in order.
+- **Tools (floating, far left of the board):** fit the whole map, centre on the selected card, tidy up the layout, show all cross-links, show a minimap.
+- **Trail (column left of the board):** the cards you visited, in order. Collapse it with `«`.
+
+On a narrow window (under about 860 px) the panel moves below the board and the trail collapses to give the board room.
 
 ### Reading a card
 
@@ -112,6 +115,7 @@ MINDMAPPER_DATA_DIR=~/Documents/mindmapper-data npm run dev
 | ⚓ badge | The anchor card. |
 | `2?` badge | The card has 2 questions saved on it. |
 | `+4` badge | A collapsed card hiding 4 cards. |
+| Your own colour | Cards are coloured by depth. Use **Colour…** in the card's menu to pick one yourself, for example to mark what you have understood. |
 | Bright ring | The selected card. Connectors along your path to it are highlighted. |
 
 ### Going deeper
@@ -120,6 +124,7 @@ MINDMAPPER_DATA_DIR=~/Documents/mindmapper-data npm run dev
 - **Click a dotted link** to create that concept under the current card and have it explained.
 - **Select any words** in an explanation or answer. A small bar offers **Explain this** (makes the selection a card) and **Ask about this** (quotes it in your question).
 - **Open a suggested concept** from **Next concepts** at the bottom of a card.
+- **Add the rest.** Concepts a card mentions but has no card for appear under **Mentioned, no card yet**. Click one to add and explain it, or press **Add all N** to add them all as cards without asking the AI anything.
 - **Ask a question** in the box at the bottom of the panel (`Enter` sends, `Shift+Enter` adds a line). The answer is saved on the card. If it names distinct kinds, parts or steps, they appear as new cards under it.
 
 If the same concept is already on the board, Mindmapper links to the existing card instead of making a copy.
@@ -135,6 +140,10 @@ Learning gets deep fast, so four tools are always on screen:
 
 **Search** (`Cmd/Ctrl+K`) finds a card by name or alternative name.
 
+### What's left
+
+The **N left** button in the top bar (or **What's left…** in the board's right-click menu) lists every card you have not explained yet, grouped by the card it hangs under, with a progress bar. Press **Open** to go to a card, or **Explain** to write it right there. Tick **Only under “…”** to see just the selected branch. Cards whose last attempt failed show **Try again**. When nothing is left the button reads **✓ all opened**.
+
 ### Arranging the board
 
 - **Drag a card** anywhere. Its position is saved. Cards you have not moved follow their parent when it moves.
@@ -142,12 +151,13 @@ Learning gets deep fast, so four tools are always on screen:
 - **Collapse a branch** to hide it (its card shows how many are hidden).
 - **Rename** a card; the old name keeps working as a link.
 - **Merge** two cards that mean the same thing; their questions and children are combined.
-- **Delete** a card and everything below it (you are asked first).
+- **Delete** a card and everything below it (you are asked first). Both delete and merge can be undone: press **Undo** on the message that appears, or `Cmd/Ctrl+Z`. Undo puts back exactly what the action changed, including questions, cross-links and positions. It is refused if one of those cards has changed since, or if a card with the same name now exists. Undo is remembered only until the server restarts.
+- **Colour** a card with **Colour…** in its menu; **Automatic** returns it to its depth colour.
 - **Export** (top bar) writes one Markdown file per card to `./data/exports/<map name>/`, with `[[wikilinks]]` intact, so the folder opens as an Obsidian vault. Exporting again replaces that folder. A folder you made yourself with the same name is never touched; a numbered one (`<map name> (2)`) is used instead.
 
 ### Right-click menu
 
-Right-click a card (or press `Shift+F10`) for everything you can do to it: Explain or Regenerate, Ask a question, **Add child concept** (creates a card by name with no AI request), go to parent or first child, set as anchor, release position, collapse, copy its link or explanation, rename, merge and delete. Right-click empty board space for fit, go to anchor, tidy up and cross-links.
+Right-click a card (or press `Shift+F10`) for everything you can do to it: Explain or Regenerate, Ask a question, **Add child concept** (creates a card by name with no AI request), go to parent or first child, set as anchor, release position, **Colour…**, collapse, copy its link or explanation, rename, merge and delete. Right-click empty board space for fit, what's left, go to anchor, tidy up and cross-links.
 
 ### Switching AI or level
 
@@ -167,6 +177,7 @@ The three buttons in the top bar choose **Light**, **System** (follows your comp
 | Keys | Action |
 |---|---|
 | `Cmd/Ctrl+K` | Search |
+| `Cmd/Ctrl+Z` | Undo the last delete or merge |
 | `Alt+←` / `Alt+→` | Back / Forward |
 | `Enter` | Explain the selected card (when the board has focus) |
 | `/` | Jump to the question box |
@@ -211,6 +222,7 @@ npm run typecheck
 npm run lint
 npx playwright install chromium   # once, for the browser tests
 npm run test:e2e     # rebuilds, then drives the app in a real browser with a fake AI
+# The same checks run in CI (.github/workflows/ci.yml) on every push and pull request.
 
 # These spend a little of your plan quota. Run them by hand.
 npm run smoke -- claude [--model haiku]            # one real call, prints timings
@@ -235,6 +247,6 @@ Rules for contributors, including the "no API keys" rule, are in [CLAUDE.md](CLA
 ## Limits
 
 - Claude and ChatGPT (Codex) are supported. Gemini is not, because its command-line tool no longer serves individual subscriptions.
-- An answer adds at most 5 new cards; further concepts it names stay as dotted links you can click.
+- An answer adds at most 5 new cards. Further concepts it names stay as dotted links, and **Add all** turns the rest into cards.
 - Explanations come from the AI's own knowledge. They can be wrong, and nothing is checked against sources.
 - One person, one computer. No accounts, sync or sharing.
