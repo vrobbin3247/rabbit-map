@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
-import { resolve, wikilinksToMarkdownLinks } from '@mindmapper/shared';
+import { protectCurrency, resolve, wikilinksToMarkdownLinks } from '@mindmapper/shared';
 import { useStore } from '../state/store';
 
 const remarkPlugins = [remarkGfm, remarkMath];
@@ -48,7 +48,7 @@ function ConceptLink({ href, fromNodeId, children }: { href: string; fromNodeId:
 }
 
 export const Markdown = memo(function Markdown({ text, fromNodeId }: { text: string; fromNodeId: string }) {
-  const source = useMemo(() => wikilinksToMarkdownLinks(text), [text]);
+  const source = useMemo(() => protectCurrency(wikilinksToMarkdownLinks(text)), [text]);
   return (
     <div className="md">
       <ReactMarkdown
@@ -56,6 +56,8 @@ export const Markdown = memo(function Markdown({ text, fromNodeId }: { text: str
         rehypePlugins={rehypePlugins}
         urlTransform={safeUrl}
         components={{
+          // Never load an image from the internet: that would send a request out of this machine.
+          img: ({ alt }) => <span className="muted">[image{alt ? `: ${alt}` : ''}]</span>,
           a: ({ href, children }) =>
             href?.startsWith('concept:') ? (
               <ConceptLink href={href} fromNodeId={fromNodeId}>{children}</ConceptLink>

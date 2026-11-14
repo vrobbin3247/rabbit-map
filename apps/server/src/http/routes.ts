@@ -96,7 +96,12 @@ export function registerRoutes(app: Hono, deps: Deps): void {
   });
 
   app.delete('/api/maps/:mapId', async (c) => {
-    await store.delete(id(c.req.param('mapId')));
+    const mapId = id(c.req.param('mapId'));
+    await store.get(mapId); // 404 for an unknown map before anything is stopped
+    // Stop anything still being written for this map, and let it finish restoring its node, so it
+    // cannot spend plan quota for a map that is going away or write the file back afterwards.
+    await jobs.abortAndWait(`${mapId}:`);
+    await store.delete(mapId);
     return c.body(null, 204);
   });
 

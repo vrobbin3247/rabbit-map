@@ -79,3 +79,25 @@ describe('Markdown', () => {
     expect(safeUrl('data:text/html,x')).toBe('');
   });
 });
+
+describe('Markdown: prices and images', () => {
+  it('shows prices as text and keeps links between them', () => {
+    const { container } = render(<Markdown fromNodeId="r" text="A GPU costs $500 and a [[Transformer]] run costs $20 more." />);
+    expect(container.querySelector('.katex')).toBeNull();
+    expect(container.textContent).toBe('A GPU costs $500 and a Transformer run costs $20 more.');
+    expect(container.querySelector('[data-concept="Transformer"]')).not.toBeNull();
+  });
+
+  it('still renders real math next to a price', () => {
+    const { container } = render(<Markdown fromNodeId="r" text="A $5\times5$ image costs $20 to label." />);
+    expect(container.querySelectorAll('.katex')).toHaveLength(1);
+    expect(container.textContent).toContain('costs $20 to label.');
+  });
+
+  it('never loads an image', () => {
+    const { container } = render(<Markdown fromNodeId="r" text="![a chart](https://evil.example/pixel.png) and ![](https://evil.example/x.png)" />);
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.textContent).toContain('[image: a chart]');
+    expect(container.innerHTML).not.toContain('evil.example');
+  });
+});

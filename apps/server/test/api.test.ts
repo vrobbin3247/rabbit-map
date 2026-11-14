@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { ConceptNode, MapFile } from '@mindmapper/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -484,6 +484,86 @@ describe('positions', () => {
     for (const n of Object.values(doc.nodes)) delete (n as { position?: unknown }).position;
     writeFileSync(path.join(env.config.mapsDir, `${map.id}.json`), JSON.stringify(doc));
     expect((await new MapStore(env.config.mapsDir).get(map.id)).rootId).toBe(map.rootId);
+  });
+});
+
+describe('export safety', () => {
+  const exportTitled = async (title: string) => {
+    const m = (await env.json('POST', '/api/maps', { topic: title })).body.map;
+    const r = await env.json('POST', `/api/maps/${m.id}/export`, {});
+    return { status: r.status, path: r.body?.path as string | undefined, map: m };
+  };
+
+  it.each(['..', '.', '...', '../..', '../../maps', '/', '\\', '.hidden'])('export of a map titled %j stays inside the exports folder', async (title) => {
+    writeFileSync(path.join(env.config.mapsDir, 'KEEPME.txt'), 'precious');
+    writeFileSync(path.join(env.config.dataDir, 'KEEPME-too.txt'), 'precious');
+    const r = await exportTitled(title);
+    expect(r.status).toBe(200);
+    expect(path.dirname(r.path!)).toBe(path.resolve(env.config.exportsDir));
+    expect(readFileSync(path.join(env.config.mapsDir, 'KEEPME.txt'), 'utf8')).toBe('precious');
+    expect(readFileSync(path.join(env.config.dataDir, 'KEEPME-too.txt'), 'utf8')).toBe('precious');
+    expect(readdirSync(env.config.mapsDir).filter((f) => f.endsWith('.json'))).toHaveLength(1); // the map itself survives
+    expect(path.basename(r.path!)).not.toMatch(/^\./);
+  });
+
+  it('replaces its own earlier export but never a folder it did not make', async () => {
+    const first = await exportTitled('Notes');
+    writeFileSync(path.join(first.path!, 'stale.md'), 'old');
+    const again = await env.json('POST', `/api/maps/${first.map.id}/export`, {});
+    expect(again.body.path).toBe(first.path);
+    expect(existsSync(path.join(first.path!, 'stale.md'))).toBe(false); // ours: replaced
+
+    // someone else's folder with the same name is left alone and a new one is used
+    const theirs = path.join(env.config.exportsDir, 'Mine');
+    mkdirSync(theirs, { recursive: true });
+    writeFileSync(path.join(theirs, 'my-notes.md'), 'my own notes');
+    const r = await exportTitled('Mine');
+    expect(readFileSync(path.join(theirs, 'my-notes.md'), 'utf8')).toBe('my own notes');
+    expect(path.basename(r.path!)).toBe('Mine (2)');
+  });
+});
+
+describe('deleting a map while it is being written', () => {
+  it('stops the generation, restores state, and leaves no file behind', async () => {
+    const m = (await env.json('POST', '/api/maps', { topic: 'Busy __hang__' })).body.map;
+    const res = await env.call('POST', `/api/maps/${m.id}/nodes/${m.rootId}/expand`, {});
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    await reader.read();
+    // A browser keeps reading, so the final event can be written. Do the same here.
+    void (async () => {
+      while (!(await reader.read().catch(() => ({ done: true }))).done) {
+        /* drain */
+      }
+    })();
+    await until(() => env.jobs.activeCount === 1);
+
+    const del = await env.json('DELETE', `/api/maps/${m.id}`);
+    expect(del.status).toBe(204);
+    expect(env.jobs.activeCount).toBe(0); // it waited for the job to wind down
+    await new Promise((r) => setTimeout(r, 100));
+    expect(existsSync(path.join(env.config.mapsDir, `${m.id}.json`))).toBe(false); // not written back
+    expect((await env.json('GET', `/api/maps/${m.id}`)).status).toBe(404);
+  });
+
+  it('an unknown map is a plain 404 and stops nothing else', async () => {
+    const other = (await env.json('POST', '/api/maps', { topic: 'Other __hang__' })).body.map;
+    const res = await env.call('POST', `/api/maps/${other.id}/nodes/${other.rootId}/expand`, {});
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    await reader.read();
+    expect((await env.json('DELETE', '/api/maps/01ARZ3NDEKTSV4RRFFQ69G5FAV')).status).toBe(404);
+    expect(env.jobs.activeCount).toBe(1);
+    await reader.cancel();
+    await until(() => env.jobs.activeCount === 0);
+  });
+});
+
+describe('the page the server serves', () => {
+  it('sends a policy that blocks anything from another origin', async () => {
+    const dist = env.config.webDist;
+    if (!existsSync(path.join(dist, 'index.html'))) return; // the web app has not been built
+    const res = await env.app.request('http://127.0.0.1:8787/');
+    expect(res.headers.get('content-security-policy')).toContain("img-src 'self' data:");
+    expect(res.headers.get('content-security-policy')).toContain("connect-src 'self'");
   });
 });
 

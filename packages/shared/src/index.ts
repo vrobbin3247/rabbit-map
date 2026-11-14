@@ -5,3 +5,4 @@ export * from './slug';
 export * from './wikilink';
 export * from './protocol';
 export * from './graph';
+export * from './markdown';

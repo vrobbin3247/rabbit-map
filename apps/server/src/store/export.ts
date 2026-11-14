@@ -1,8 +1,48 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { buildIndex, pathOf, type ConceptNode, type MapFile } from '@mindmapper/shared';
 
-const safeName = (s: string) => s.replace(/[\\/:*?"<>|#^[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) || 'Untitled';
+/**
+ * A file or folder name made from a title. Never empty, never "." or "..", never hidden, and
+ * never containing a path separator, so it cannot point outside the folder it is joined onto.
+ */
+export const safeName = (s: string) =>
+  s
+    .replace(/[\\/:*?"<>|#^[\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[.\s]+|[.\s]+$/g, '')
+    .slice(0, 100)
+    .trim() || 'Untitled';
+
+/** Marks a folder as one we wrote, so a later export may replace it and never anything else. */
+const MARKER = '.mindmapper-export';
+
+async function exists(p: string): Promise<boolean> {
+  try {
+    await stat(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The folder to write into: our own earlier export is replaced; a folder someone else made is left alone. */
+async function chooseDir(root: string, title: string): Promise<string> {
+  const base = safeName(title);
+  for (let i = 1; i < 1000; i++) {
+    const dir = path.resolve(root, i === 1 ? base : `${base} (${i})`);
+    // Defence in depth: whatever the name was, the result must be a direct child of the exports folder.
+    if (path.dirname(dir) !== root) throw new Error('Refusing to export outside the exports folder.');
+    if (!(await exists(dir))) return dir;
+    if (await exists(path.join(dir, MARKER))) {
+      await rm(dir, { recursive: true, force: true });
+      return dir;
+    }
+    if ((await readdir(dir)).length === 0) return dir;
+  }
+  throw new Error('Too many exports with the same name.');
+}
 
 function fileNames(map: MapFile): Map<string, string> {
   const used = new Set<string>();
@@ -38,9 +78,11 @@ function render(map: MapFile, n: ConceptNode, names: Map<string, string>): strin
 
 /** Writes one Markdown file per node; wikilinks stay as [[Title]] and resolve by title or alias. */
 export async function exportMap(map: MapFile, exportsDir: string): Promise<{ path: string; files: number }> {
-  const dir = path.join(exportsDir, safeName(map.title));
-  await rm(dir, { recursive: true, force: true });
+  const root = path.resolve(exportsDir);
+  await mkdir(root, { recursive: true });
+  const dir = await chooseDir(root, map.title);
   await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, MARKER), 'Written by Mindmapper. Exporting this map again replaces this folder.\n', 'utf8');
   const names = fileNames(map);
   buildIndex(map);
   for (const n of Object.values(map.nodes)) {

@@ -8,6 +8,9 @@ export class Job {
   private resolveReady!: () => void;
   private rejectReady!: (e: unknown) => void;
   private finished = false;
+  /** Resolves once the job has fully wound down (state restored, slot released). */
+  readonly settled: Promise<void>;
+  private resolveSettled!: () => void;
 
   constructor(
     readonly key: string,
@@ -15,6 +18,7 @@ export class Job {
     private onDone: (job: Job) => void,
   ) {
     this.queued = queued;
+    this.settled = new Promise<void>((res) => (this.resolveSettled = res));
     this.ready = new Promise<void>((res, rej) => {
       this.resolveReady = res;
       this.rejectReady = rej;
@@ -44,6 +48,7 @@ export class Job {
     if (this.finished) return;
     this.finished = true;
     this.onDone(this);
+    this.resolveSettled();
   }
 }
 
@@ -84,6 +89,14 @@ export class JobManager {
       this.running.add(next);
       next.start();
     }
+  }
+
+  /** Abort every job whose key starts with `prefix` and wait (briefly) for each to wind down. */
+  async abortAndWait(prefix: string, timeoutMs = 5000): Promise<number> {
+    const jobs = [...this.all.values()].filter((j) => j.key.startsWith(prefix));
+    for (const j of jobs) j.abort();
+    await Promise.race([Promise.all(jobs.map((j) => j.settled)), new Promise((r) => setTimeout(r, timeoutMs))]);
+    return jobs.length;
   }
 
   abortAll(): void {

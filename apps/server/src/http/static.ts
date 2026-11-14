@@ -16,6 +16,8 @@ const TYPES: Record<string, string> = {
   '.map': 'application/json',
 };
 
+const CSP = "img-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'";
+
 export async function serveWeb(root: string, c: Context): Promise<Response> {
   const rel = decodeURIComponent(c.req.path).replace(/^\/+/, '');
   const full = path.resolve(root, rel || 'index.html');
@@ -26,7 +28,10 @@ export async function serveWeb(root: string, c: Context): Promise<Response> {
       if (!s.isFile()) continue;
       const body = await readFile(candidate);
       const type = TYPES[path.extname(candidate)] ?? 'application/octet-stream';
-      return new Response(body, { headers: { 'content-type': type } });
+      const headers: Record<string, string> = { 'content-type': type };
+      // Defence in depth: this page may load nothing from another origin, whatever an answer contains.
+      if (type.startsWith('text/html')) headers['content-security-policy'] = CSP;
+      return new Response(body, { headers });
     } catch {
       /* try next */
     }
