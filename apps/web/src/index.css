@@ -146,7 +146,8 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 .btn-ghost::before { display: none; }
 .btn-ghost:hover:not(:disabled) { background: var(--sunken); transform: none; }
 .btn-more { border-radius: var(--wob-lg); padding: 2px 14px; font-size: 20px; line-height: 1.1; }
-.btn-ask { border-radius: var(--wob-lg); padding: 7px 22px; font-size: 17px; }
+.btn-ask { border-radius: var(--wob-lg); padding: 7px 22px; font-size: 17px; background: var(--marker-b); color: var(--ink); }
+.btn-ask:hover:not(:disabled) { background: var(--marker-b); filter: brightness(0.95); }
 .btn-hl { background: var(--marker-y); }
 .field { border: 2px solid var(--ink); border-radius: var(--wob); padding: 5px 12px; background: var(--panel); width: 100%; }
 .field-hl { background-color: var(--marker-y); }
@@ -158,11 +159,11 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 .opt.active { background: var(--marker-y); }
 .opt[aria-selected='true'] { color: var(--accent); }
 .opt.disabled { opacity: 0.45; cursor: not-allowed; }
-.chip { position: relative; display: inline-flex; align-items: center; gap: 4px; padding: 3px 18px; border: 0; border-radius: 999px; background: var(--panel); font-size: 14px; cursor: pointer; }
+.chip { position: relative; display: inline-flex; align-items: center; gap: 4px; padding: 3px 18px; border: 0; border-radius: 999px; background: var(--hl, var(--panel)); font-size: 14px; cursor: pointer; }
 .chip::before { border-width: 1.6px; }
 .chip.stub::before { border-style: dashed; }
-.chip.stub { color: var(--muted); }
-.chip:hover { background: var(--marker-y); }
+.chip.stub:not([data-tone]) { color: var(--muted); }
+.chip:hover::before { border-style: solid; border-width: 2.4px; }
 .muted { color: var(--muted); }
 .banner { padding: 8px 14px; font-size: 15px; display: flex; gap: 10px; align-items: center; border-bottom: 2px solid var(--ink); }
 .banner.error { background: var(--danger-soft); color: var(--danger); }
@@ -210,12 +211,18 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 .md a { color: var(--accent); }
 .md .katex-display { overflow-x: auto; overflow-y: hidden; margin: 0.8em 0; padding: 10px 14px; background: var(--sunken); border: 1.5px solid var(--border); border-radius: 10px; }
 .link-concept, .link-ghost { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); }
-/* Concept links are marker streaks: solid blue for a card you have, a paler yellow streak with a dashed edge for one you have not made yet. */
-.link-concept, .link-ghost { color: inherit; text-decoration: none; padding: 0 3px; margin: 0 -1px; border-radius: 3px 7px 4px 8px; box-decoration-break: clone; -webkit-box-decoration-break: clone; transition: background-size 0.15s, background-color 0.15s; }
-.link-concept { background: linear-gradient(transparent 52%, var(--marker-b) 52%, var(--marker-b) 92%, transparent 92%); }
-.link-ghost { background: linear-gradient(transparent 52%, var(--marker-y) 52%, var(--marker-y) 92%, transparent 92%); border-bottom: 0; }
-.link-concept:hover { background: var(--marker-b); }
-.link-ghost:hover { background: var(--marker-y); }
+/* A concept link is a soft highlight in the colour of the card it points to, so the text, the chips and the board agree.
+   A dashed edge means "not explained yet"; grey with a dashed edge means "no card yet". */
+.link-concept, .link-ghost { color: inherit; text-decoration: none; padding: 1px 4px; margin: 0; line-height: 1.35; background: var(--hl, var(--marker-b)); border-radius: 5px 9px 6px 10px / 9px 6px 10px 5px; transition: box-shadow 0.12s; }
+.link-ghost { --hl: var(--sunken); }
+.link-concept.stub, .link-ghost { outline: 1.5px dashed var(--ink-soft); outline-offset: -1.5px; }
+.link-concept:hover, .link-ghost:hover { outline: 0; box-shadow: 0 0 0 1.8px var(--ink); }
+.link-concept[data-tone='0'], .chip[data-tone='0'] { --hl: var(--tone-0); }
+.link-concept[data-tone='1'], .chip[data-tone='1'] { --hl: var(--tone-1); }
+.link-concept[data-tone='2'], .chip[data-tone='2'] { --hl: var(--tone-2); }
+.link-concept[data-tone='3'], .chip[data-tone='3'] { --hl: var(--tone-3); }
+.link-concept[data-tone='4'], .chip[data-tone='4'] { --hl: var(--tone-4); }
+.link-concept[data-tone='5'], .chip[data-tone='5'] { --hl: var(--tone-5); }
 
 /* Canvas nodes: sticky notes outlined in ink, one colour per depth */
 .cnode { position: relative; width: 220px; height: 72px; box-sizing: border-box; padding: 8px 14px; border-radius: var(--wob); border: 2px solid var(--ink); background: var(--fill); color: var(--text); box-shadow: var(--shadow); cursor: grab; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 2px; transition: box-shadow 0.15s; }

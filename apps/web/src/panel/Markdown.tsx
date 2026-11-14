@@ -4,6 +4,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { protectCurrency, resolve, wikilinksToMarkdownLinks } from '@mindmapper/shared';
+import { toneOf } from '../canvas/ConceptNodeView';
 import { useStore } from '../state/store';
 
 const remarkPlugins = [remarkGfm, remarkMath];
@@ -36,7 +37,8 @@ function ConceptLink({ href, fromNodeId, children }: { href: string; fromNodeId:
   return (
     <button
       type="button"
-      className={node ? 'link-concept' : 'link-ghost'}
+      className={node ? (node.status === 'stub' ? 'link-concept stub' : 'link-concept') : 'link-ghost'}
+      data-tone={node && index ? toneOf(node, index.depth.get(node.id) ?? 0) : undefined}
       data-concept={target}
       data-existing={node ? 'true' : 'false'}
       title={node ? node.summary || node.title : 'Not opened yet. Click to add.'}

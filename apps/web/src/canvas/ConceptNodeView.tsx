@@ -18,6 +18,9 @@ export type ConceptFlowNode = Node<ConceptData, 'concept'>;
 export const TONES = 6;
 export const TONE_HEX = ['#f0d86a', '#8fc3f5', '#8fd6a3', '#f5a3c0', '#f5b97c', '#b9a3f0'];
 
+/** The colour a card shows on the board: the learner's choice, or else its depth's colour. Links and chips reuse it. */
+export const toneOf = (node: ConceptNode, depth: number): number => node.color ?? depth % TONES;
+
 const STATE_TEXT: Record<ConceptNode['status'], string> = {
   stub: '',
   generating: 'Writing…',
@@ -31,7 +34,7 @@ export function ConceptNodeView({ data }: NodeProps<ConceptFlowNode>) {
   const cls = ['cnode', node.status, selected && 'selected', onPath && 'on-path', !visited && 'unvisited', dim && 'dim'].filter(Boolean).join(' ');
   const label = [node.title, node.status === 'stub' ? 'not explained yet' : node.status, node.summary].filter(Boolean).join('. ');
   return (
-    <div className={cls} data-tone={node.color ?? depth % TONES} role="button" aria-label={label} aria-pressed={selected} title={node.title}>
+    <div className={cls} data-tone={toneOf(node, depth)} role="button" aria-label={label} aria-pressed={selected} title={node.title}>
       <Handle type="target" position={Position.Left} className="hdl" isConnectable={false} />
       <div className="badge">
         {anchor && <span className="anchor" title="Anchor">⚓</span>}

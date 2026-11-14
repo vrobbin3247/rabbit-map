@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ConceptNode } from '@mindmapper/shared';
+import { toneOf } from '../canvas/ConceptNodeView';
 import { useStore } from '../state/store';
 import { nodeMenu } from '../nav/nodeActions';
 import { MenuList } from '../ui/MenuList';
@@ -95,7 +96,7 @@ export function NodePanel() {
   const related = node.related.map((id) => map.nodes[id]).filter((n): n is ConceptNode => !!n);
   const go = (id: string) => useStore.getState().select(id);
   const chip = (n: ConceptNode) => (
-    <button key={n.id} className={`chip ${n.status === 'stub' ? 'stub' : ''}`} onClick={() => go(n.id)} title={n.summary || n.title}>{n.title}</button>
+    <button key={n.id} className={`chip ${n.status === 'stub' ? 'stub' : ''}`} data-tone={toneOf(n, index.depth.get(n.id) ?? 0)} onClick={() => go(n.id)} title={n.summary || n.title}>{n.title}</button>
   );
 
   return (

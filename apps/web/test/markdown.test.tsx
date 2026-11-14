@@ -14,6 +14,16 @@ afterEach(() => {
 });
 
 describe('Markdown', () => {
+  it('a link carries the colour of the card it points to; a link with no card has none', () => {
+    const st = useStore.getState();
+    const cnn = Object.values(st.map!.nodes).find((n) => n.title === 'Convolutional Neural Network' || n.aliases.includes('CNN'))!;
+    render(<Markdown fromNodeId="r" text="See [[CNN]] and [[Pooling]]." />);
+    const link = screen.getByText('CNN') as HTMLElement;
+    expect(link.dataset.tone).toBe(String(cnn.color ?? (st.index!.depth.get(cnn.id) ?? 0) % 6));
+    expect((screen.getByText('Pooling') as HTMLElement).dataset.tone).toBeUndefined();
+    expect(screen.getByText('Pooling').className).toContain('link-ghost');
+  });
+
   it('a link inside bold, as at the start of a list item, is still a link, and the list renders as list items', () => {
     const { container } = render(<Markdown fromNodeId="r" text={'Kinds:\n\n- **[[CNN]]:** one\n- **[[Pooling]]:** two\n\nKeep **millimetres** in mind.'} />);
     expect(container.querySelectorAll('li')).toHaveLength(2);
